@@ -6,127 +6,257 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 
 -- Require the necessary modules
 local TabManager = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Core"):WaitForChild("TabManager"))
 local MenuStructure = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Core"):WaitForChild("MenuStructure"))
 
--- Reference to the Menu ScreenGui
-local menuGui = playerGui:WaitForChild("Menu")
-local menuBackground = menuGui:WaitForChild("Background")
-local mainFrame = menuGui:WaitForChild("Main")
-
 -- Keep track of whether initialization has occurred
 local isInitialized = false
+local tabManagerInstance = nil
+
+-- Function to safely wait for an object with timeout
+local function safeWaitForChild(parent, childName, timeout)
+	timeout = timeout or 5 -- Default timeout of 5 seconds
+
+	local child = parent:FindFirstChild(childName)
+	if child then return child end
+
+	local startTime = os.clock()
+	local connection
+	local childFound = false
+
+	-- Create a promise-like system with timeout
+	local thread = coroutine.running()
+
+	connection = parent.ChildAdded:Connect(function(newChild)
+		if newChild.Name == childName then
+			childFound = true
+			connection:Disconnect()
+			connection = nil
+			coroutine.resume(thread, newChild)
+		end
+	end)
+
+	-- Wait for the child or timeout
+	local result = nil
+	task.spawn(function()
+		while os.clock() - startTime < timeout and not childFound do
+			-- Check again in case it was added between checks
+			child = parent:FindFirstChild(childName)
+			if child then
+				childFound = true
+				if connection then
+					connection:Disconnect()
+					connection = nil
+				end
+				result = child
+				coroutine.resume(thread)
+				return
+			end
+			task.wait(0.1)
+		end
+
+		-- Timeout occurred
+		if connection then
+			connection:Disconnect()
+			connection = nil
+		end
+		coroutine.resume(thread)
+	end)
+
+	coroutine.yield()
+
+	-- Return the found child or nil if timed out
+	return result or parent:FindFirstChild(childName)
+end
+
+-- Function to get references to UI elements
+local function getUIReferences()
+	print("Trying to get UI references...")
+
+	-- Try to find Interface
+	local playerGui = player:WaitForChild("PlayerGui", 10)
+	if not playerGui then
+		warn("PlayerGui not found after 10 seconds")
+		return nil
+	end
+
+	-- Try both possible paths for Menu
+	local Interface = playerGui:FindFirstChild("Interface")
+	local Menu = nil
+
+	if Interface then
+		Menu = safeWaitForChild(Interface, "Menu", 2)
+	end
+
+	-- If not found, look directly in PlayerGui
+	if not Menu then
+		Menu = safeWaitForChild(playerGui, "Menu", 2)
+	end
+
+	if not Menu then
+		warn("Menu not found in either PlayerGui.Interface or PlayerGui directly")
+		-- Create a retry mechanism by returning a function instead of nil
+		return function()
+			return getUIReferences()
+		end
+	end
+
+	print("Found Menu:", Menu:GetFullName())
+
+	-- Now get Background
+	local Background = Menu:FindFirstChild("Background")
+	if not Background then
+		warn("Background not found in Menu")
+		return nil
+	end
+
+	-- Now check for the required UI components
+	local TopBar = Background:FindFirstChild("TopBar")
+	local SideTabs = Background:FindFirstChild("SideTabs")
+	local Content = Background:FindFirstChild("Content")
+
+	if not (TopBar and SideTabs and Content) then
+		warn("Missing required UI components in Background:")
+		warn("- TopBar:", TopBar ~= nil)
+		warn("- SideTabs:", SideTabs ~= nil)
+		warn("- Content:", Content ~= nil)
+		return nil
+	end
+
+	print("Found all required UI components")
+
+	return {
+		Interface = Interface,
+		Menu = Menu,
+		Background = Background
+	}
+end
 
 -- Function to initialize the tab system
 local function initializeTabSystem()
 	if isInitialized then return end
 
-	-- Debug output to help us understand the structure
-	print("Initializing tab system...")
-	print("Menu structure:")
-	print("- TopTabs exists:", mainFrame:FindFirstChild("TopTabs") ~= nil)
-	print("- SideTabs exists:", mainFrame:FindFirstChild("SideTabs") ~= nil)
-	print("- Content exists:", mainFrame:FindFirstChild("Content") ~= nil)
+	print("Attempting to initialize tab system...")
 
-	-- Check if TabManager is an object or a table with functions
-	local initMethod = nil
-	if typeof(TabManager) == "table" then
-		-- Output available methods
-		print("TabManager methods:")
-		for key, value in pairs(TabManager) do
-			if typeof(value) == "function" then
-				print("- " .. key)
-				if key == "new" or key == "Create" or key == "Init" then
-					initMethod = key
-				end
+	-- Get UI references
+	local references = getUIReferences()
+
+	-- If references is a function, it means we need to retry
+	if type(references) == "function" then
+		print("Menu not found, will retry later...")
+		return false
+	end
+
+	-- If we couldn't get the references, exit
+	if not references then
+		warn("Failed to get UI references, cannot initialize tab system")
+		return false
+	end
+
+	local Background = references.Background
+	local Menu = references.Menu
+
+	-- Create a new TabManager instance
+	tabManagerInstance = TabManager.new()
+
+	-- Initialize the TabManager with the Background frame
+	print("Initializing TabManager with Background:", Background:GetFullName())
+	tabManagerInstance:Initialize(Background, {debug = true})
+
+	-- Mark as initialized if successful
+	if tabManagerInstance.state.isInitialized then
+		isInitialized = true
+		print("Menu tab system initialization completed successfully")
+
+		-- Also set up a connection to Menu's visibility change
+		Menu:GetPropertyChangedSignal("Visible"):Connect(function()
+			if Menu.Visible and tabManagerInstance and tabManagerInstance.state.currentTopTab then
+				print("Menu visibility changed to visible, refreshing tabs")
+				tabManagerInstance:SelectTopTab(tabManagerInstance.state.currentTopTab)
 			end
-		end
-	end
-
-	-- Try to initialize TabManager properly
-	local tabManagerInstance = TabManager
-	if initMethod then
-		-- If there's an initialization method, call it
-		print("Using initialization method:", initMethod)
-		tabManagerInstance = TabManager[initMethod](mainFrame)
-	end
-
-	-- Try both approaches - as an object method and as a function
-	local success = false
-
-	-- Try approach 1: Call as an object method with colon syntax
-	pcall(function()
-		TabManager:Initialize(mainFrame, {debug = true})
-		success = true
-		print("Successfully initialized TabManager using colon syntax")
-	end)
-
-	-- If that failed, try approach 2: Call as a function with dot syntax
-	if not success then
-		pcall(function()
-			TabManager.Initialize(tabManagerInstance, mainFrame, {debug = true})
-			success = true
-			print("Successfully initialized TabManager using dot syntax")
 		end)
+
+		return true
+	else
+		warn("Menu tab system initialization failed")
+		return false
+	end
+end
+
+-- Function to periodically check for Menu and initialize tab system if it exists
+local function startInitializationCheck()
+	local success = false
+	local attempts = 0
+	local maxAttempts = 10
+
+	local function checkAndInitialize()
+		attempts = attempts + 1
+		print("Initialization check attempt", attempts, "of", maxAttempts)
+
+		success = initializeTabSystem()
+
+		if success then
+			print("Tab system initialized successfully on attempt", attempts)
+			return true
+		elseif attempts >= maxAttempts then
+			warn("Failed to initialize tab system after", maxAttempts, "attempts")
+			return true -- Stop trying
+		else
+			return false -- Continue trying
+		end
 	end
 
-	-- If both approaches failed, try direct property access
-	if not success then
-		-- Create a minimal implementation to get things working
-		print("Both initialization approaches failed, using fallback implementation")
+	-- Try immediately once
+	if checkAndInitialize() then return end
 
-		-- Set up manual tab switching
-		local topTabs = mainFrame:FindFirstChild("TopTabs")
-		local sideTabs = mainFrame:FindFirstChild("SideTabs")
-		local content = mainFrame:FindFirstChild("Content")
+	-- Set up a repeating check
+	task.spawn(function()
+		while not success and attempts < maxAttempts do
+			task.wait(2) -- Check every 2 seconds
+			if checkAndInitialize() then break end
+		end
+	end)
+end
 
-		if topTabs and sideTabs and content then
-			-- Connect top tab buttons
-			for _, topTabButton in pairs(topTabs:GetChildren()) do
-				if topTabButton:IsA("TextButton") or topTabButton:IsA("ImageButton") then
-					topTabButton.MouseButton1Click:Connect(function()
-						-- Handle top tab selection
-						print("Selected top tab:", topTabButton.Name)
+-- Start the initialization check when the script runs
+startInitializationCheck()
 
-						-- Here we would implement manual tab switching
-						-- based on your MenuStructure
-					end)
-				end
+-- Also connect to the Menu button if we can find it
+task.spawn(function()
+	local playerGui = player:WaitForChild("PlayerGui", 10)
+	if not playerGui then return end
+
+	local menuButtonPath = {"Interface", "HUD", "RightHUD", "MenuButton"}
+	local currentParent = playerGui
+
+	for _, name in ipairs(menuButtonPath) do
+		currentParent = currentParent:FindFirstChild(name)
+		if not currentParent then
+			warn("Could not find", name, "while looking for MenuButton")
+			return
+		end
+	end
+
+	local menuButton = currentParent
+
+	print("Found MenuButton, connecting click handler")
+
+	menuButton.MouseButton1Click:Connect(function()
+		print("MenuButton clicked")
+
+		-- If system is not yet initialized, try to initialize it now
+		if not isInitialized then
+			print("Tab system not initialized yet, attempting now...")
+			local success = initializeTabSystem()
+			if not success then
+				warn("Failed to initialize tab system on MenuButton click")
 			end
 		else
-			warn("Could not find required UI elements for fallback implementation")
+			print("Tab system already initialized")
 		end
-	end
+	end)
+end)
 
-	-- Mark as initialized
-	isInitialized = true
-	print("Menu tab system initialization completed")
-end
-
--- Function to handle menu visibility changes
-local function onMenuVisibilityChanged()
-	if menuGui.Enabled then
-		-- Make sure tab system is initialized when menu becomes visible
-		if not isInitialized then
-			initializeTabSystem()
-		else
-			-- Restore tab state logic would go here
-			print("Menu reopened, would restore previous tab state")
-		end
-	end
-end
-
--- Connect to menu visibility changes
-menuGui:GetPropertyChangedSignal("Enabled"):Connect(onMenuVisibilityChanged)
-
--- Initialize if menu is already visible
-if menuGui.Enabled then
-	initializeTabSystem()
-end
-
--- Log that the script has loaded
 print("MenuController script loaded successfully")
-

@@ -4,42 +4,49 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MenuStructure = require(ReplicatedStorage.Modules.Core.MenuStructure)
 
-local TabManager = {
+local TabManager = {}
+TabManager.__index = TabManager  -- Setup metatable for OOP
+
+-- Create new TabManager instance
+function TabManager.new()
+	local self = {}
+	setmetatable(self, TabManager)  -- Set the metatable for proper inheritance
+
 	-- UI references (populated during initialization)
-	ui = {
-		menuFrame = nil,            -- The main menu frame
-		topTabContainer = nil,      -- Container for top tab buttons
+	self.ui = {
+		menuFrame = nil,            -- The main menu frame (Background)
+		topTabContainer = nil,      -- Container for top tab buttons (TopBar)
 		topTabButtons = {},         -- Individual top tab buttons
-		sideTabContainer = nil,     -- Container for side tab buttons
+		sideTabContainer = nil,     -- Container for side tab buttons (SideTabs)
 		sideTabButtons = {},        -- Individual side tab buttons
-		contentContainer = nil,     -- Container for content frames
+		contentContainer = nil,     -- Container for content frames (Content)
 		contentFrames = {},         -- Individual content frames
 		templates = {
 			sideTabButton = nil     -- Template for side tab buttons
 		}
-	},
+	}
 
 	-- Visual state tracking
-	colors = {
+	self.colors = {
 		originalTopTabColors = {},  -- Original colors of top tab buttons
 		originalSideTabColors = {}  -- Original colors of side tab buttons
-	},
+	}
 
 	-- Current state of the menu
-	state = {
+	self.state = {
 		currentTopTab = nil,        -- Currently selected top tab
 		currentSideTab = nil,       -- Currently selected side tab
 		lastSideTabPerTopTab = {},  -- Remembers last side tab for each top tab
 		isInitialized = false,      -- Whether initialization has occurred
 		debug = false               -- Debug mode toggle
 	}
-}
 
--- Internal utility functions
+	return self
+end
 
 -- Debug print function that only outputs when debug mode is on
-local function debugPrint(...)
-	if TabManager.state.debug then
+function TabManager:DebugPrint(...)
+	if self.state.debug then
 		print("[TabManager]", ...)
 	end
 end
@@ -54,9 +61,14 @@ end
 
 -- Initialize the TabManager with references to UI elements
 function TabManager:Initialize(menuFrame, config)
+	if not menuFrame then
+		warn("TabManager: menuFrame is nil! Cannot initialize.")
+		return self
+	end
+
 	if self.state.isInitialized then
-		debugPrint("TabManager already initialized")
-		return
+		self:DebugPrint("TabManager already initialized")
+		return self
 	end
 
 	-- Set debug mode from config if provided
@@ -64,33 +76,46 @@ function TabManager:Initialize(menuFrame, config)
 		self.state.debug = config.debug
 	end
 
-	debugPrint("Initializing TabManager")
+	self:DebugPrint("Initializing TabManager with menu frame:", menuFrame.Name)
 
-	-- Store reference to menu frame
+	-- Store reference to menu frame (Background)
 	self.ui.menuFrame = menuFrame
 
-	-- Find necessary UI containers
-	self.ui.topTabContainer = menuFrame:FindFirstChild("TopTabs")
-	self.ui.sideTabContainer = menuFrame:FindFirstChild("SideTabs")
-	self.ui.contentContainer = menuFrame:FindFirstChild("Main"):FindFirstChild("Content")
+	-- Based on the screenshot, we know the exact paths to UI elements
+	-- TopTabs is located in Background.TopBar
+	local topBar = menuFrame:FindFirstChild("TopBar")
+	if not topBar then
+		warn("TabManager: Could not find TopBar in " .. menuFrame.Name)
+		return self
+	end
+	self.ui.topTabContainer = topBar
 
-	-- Validate required UI elements
-	if not (self.ui.topTabContainer and self.ui.sideTabContainer and self.ui.contentContainer) then
-		warn("TabManager: Missing required UI elements. Ensure your menu has TopTabs, SideTabs, and Main.Content.")
-		return
+	-- SideTabs is located directly in Background
+	self.ui.sideTabContainer = menuFrame:FindFirstChild("SideTabs")
+	if not self.ui.sideTabContainer then
+		warn("TabManager: Could not find SideTabs in " .. menuFrame.Name)
+		return self
+	end
+
+	-- Content is located directly in Background
+	self.ui.contentContainer = menuFrame:FindFirstChild("Content")
+	if not self.ui.contentContainer then
+		warn("TabManager: Could not find Content in " .. menuFrame.Name)
+		return self
 	end
 
 	-- Find template for side tab buttons
 	self.ui.templates.sideTabButton = self.ui.sideTabContainer:FindFirstChild("Template")
 	if not self.ui.templates.sideTabButton then
 		warn("TabManager: Missing SideTab button template. Ensure your SideTabs container has a Template child.")
-		return
+		return self
 	end
 
 	-- Hide the template
 	self.ui.templates.sideTabButton.Visible = false
 
 	-- Load all top tab buttons and capture original colors
+	self:DebugPrint("Loading top tab buttons from", self.ui.topTabContainer.Name)
 	for _, topTabButton in ipairs(self.ui.topTabContainer:GetChildren()) do
 		if (topTabButton:IsA("TextButton") or topTabButton:IsA("ImageButton")) and not topTabButton:IsA("ValueBase") then
 			-- Register this button
@@ -105,7 +130,7 @@ function TabManager:Initialize(menuFrame, config)
 				self:SelectTopTab(tabName)
 			end)
 
-			debugPrint("Registered top tab button:", tabName)
+			self:DebugPrint("Registered top tab button:", tabName)
 		end
 	end
 
@@ -113,6 +138,7 @@ function TabManager:Initialize(menuFrame, config)
 	self.colors.originalSideTabColor = self.ui.templates.sideTabButton.BackgroundColor3
 
 	-- Load all content frames
+	self:DebugPrint("Loading content frames from", self.ui.contentContainer.Name)
 	for _, contentFrame in ipairs(self.ui.contentContainer:GetChildren()) do
 		if contentFrame:IsA("Frame") or contentFrame:IsA("ScrollingFrame") then
 			-- Register this frame
@@ -122,7 +148,7 @@ function TabManager:Initialize(menuFrame, config)
 			-- Hide all frames initially
 			contentFrame.Visible = false
 
-			debugPrint("Registered content frame:", frameName)
+			self:DebugPrint("Registered content frame:", frameName)
 		end
 	end
 
@@ -136,7 +162,7 @@ function TabManager:Initialize(menuFrame, config)
 
 	-- Mark as initialized
 	self.state.isInitialized = true
-	debugPrint("TabManager initialization complete")
+	self:DebugPrint("TabManager initialization complete")
 
 	return self
 end
@@ -154,7 +180,7 @@ function TabManager:SelectTopTab(topTabName)
 		return
 	end
 
-	debugPrint("Selecting top tab:", topTabName)
+	self:DebugPrint("Selecting top tab:", topTabName)
 
 	-- Update state
 	self.state.currentTopTab = topTabName
@@ -183,7 +209,7 @@ function TabManager:SelectSideTab(sideTabName)
 		return
 	end
 
-	debugPrint("Selecting side tab:", sideTabName)
+	self:DebugPrint("Selecting side tab:", sideTabName)
 
 	-- Update state
 	self.state.currentSideTab = sideTabName
@@ -319,7 +345,7 @@ function TabManager:ShowContentFrame(frameName)
 	local contentFrame = self.ui.contentFrames[frameName]
 	if contentFrame then
 		contentFrame.Visible = true
-		debugPrint("Showing content frame:", frameName)
+		self:DebugPrint("Showing content frame:", frameName)
 
 		-- Fire content shown event (can be used for lazy loading)
 		local contentShown = Instance.new("BindableEvent")
@@ -341,4 +367,5 @@ function TabManager:GetCurrentTabs()
 	}
 end
 
+-- Export the module
 return TabManager
