@@ -1,6 +1,7 @@
 -- /ServerScriptService/Modules/Core/Boosters.lua
 -- ModuleScript that defines all boosters and their properties
 -- This is a server-side module for managing booster functionality
+-- See Boosters in OneNote for recent discussion notes
 
 local Boosters = {}
 
@@ -13,9 +14,26 @@ local ServerScriptService = game:GetService("ServerScriptService")
 Boosters.BoosterTypes = {
 	PLAYER = "PlayerBoost", -- Affects player character
 	DICE = "DiceBoost",     -- Affects dice appearance or performance
-	TYCOON = "TycoonBoost", -- Affects tycoon mechanics
 	GLOBAL = "GlobalBoost"  -- Affects game-wide mechanics
 }
+
+--mushrooms small
+--bugs jump
+--light crystals walk speed
+--pearls swim speed
+--lavaball drop a block
+--fuel jetpack (maybe more)
+-- come from object in world, pick up a thing from an object with a tag
+-- that tag is the only thing that tells you the object can be picked up
+-- whole world is build around this, do need it to work
+-- e to pick up
+
+-- alternative: affect dice game. all of dice, ui, frame other items that affect
+-- dice game. these will be cards that spin around, not looking like part of the
+-- scenery. float like a spinning hologram, like fruits but flat.
+-- fruits, dice will look like part of the world. these will spin around flat.
+-- betting, odds of face die, anything that affects with game within the game.
+
 
 -- Booster definitions with all properties
 Boosters.Boosters = {
