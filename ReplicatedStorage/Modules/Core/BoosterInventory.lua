@@ -203,10 +203,16 @@ function BoosterInventory.Populate()
 		return
 	end
 
-	-- Find the template
-	local template = boostersFrame:FindFirstChild("BoosterSlot")
+	-- Find the template using the ObjectValue reference
+	local templateRef = boostersFrame:FindFirstChild("Template")
+	if not templateRef or not templateRef:IsA("ObjectValue") or not templateRef.Value then
+		warn("Template reference not found or invalid")
+		return
+	end
+
+	local template = templateRef.Value
 	if not template then
-		warn("BoosterSlot template not found in Boosters frame")
+		warn("Template not found")
 		return
 	end
 
@@ -215,7 +221,7 @@ function BoosterInventory.Populate()
 
 	-- Clear existing booster slots (except the template)
 	for _, child in ipairs(boostersFrame:GetChildren()) do
-		if child.Name == "BoosterSlot" and child ~= template and child:GetAttribute("IsTemplate") ~= true then
+		if child:IsA("Frame") and child ~= template and child:GetAttribute("IsTemplate") ~= true then
 			child:Destroy()
 		end
 	end
