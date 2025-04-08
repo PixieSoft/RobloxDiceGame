@@ -1,4 +1,4 @@
--- /ServerScriptService/Modules/Core/Boosters.lua
+-- /ReplicatedStorage/Modules/Core/Boosters.lua
 -- ModuleScript that defines all boosters and their properties
 -- This is a server-side module for managing booster functionality
 -- See Boosters in OneNote for recent discussion notes
