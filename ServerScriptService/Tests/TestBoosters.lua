@@ -1,12 +1,12 @@
 -- /ServerScriptService/Tests/TestBoosters.lua
 -- Simple script that creates a small window showing booster values with +1 buttons
 
-local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 -- Get the Boosters module for adding boosters
-local Boosters = require(ServerScriptService.Modules.Core.Boosters)
+local Boosters = require(ReplicatedStorage.Modules.Core.Boosters)
 
 local function CreateSimpleBoosterDisplay(player)
 	-- Create ScreenGui
