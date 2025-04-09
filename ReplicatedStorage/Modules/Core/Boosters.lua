@@ -22,9 +22,9 @@ Boosters.BoosterTypes = {
 -- Booster definitions with all properties
 Boosters.Boosters = {
 	LightCrystals = {
-		name = "Light Crystal",
+		name = "Crystal",
 		description = "Increases player speed by 25% for 3 minutes",
-		imageId = "rbxassetid://7123456789", -- Replace with actual image ID
+		imageId = "rbxassetid://72049224483385",
 		boosterType = Boosters.BoosterTypes.PLAYER,
 		duration = 180, -- 3 minutes in seconds
 		stacks = false,
@@ -57,9 +57,9 @@ Boosters.Boosters = {
 	},
 
 	Mushrooms = {
-		name = "Magic Mushroom",
+		name = "Mushroom",
 		description = "Allows player to jump 50% higher for 2 minutes",
-		imageId = "rbxassetid://7123456790", -- Replace with actual image ID
+		imageId = "rbxassetid://134097767361051",
 		boosterType = Boosters.BoosterTypes.PLAYER,
 		duration = 120, -- 2 minutes in seconds
 		stacks = false,
@@ -90,7 +90,7 @@ Boosters.Boosters = {
 	LavaBalls = {
 		name = "Lava Ball",
 		description = "Grants immunity to fire damage for 5 minutes",
-		imageId = "rbxassetid://7123456791", -- Replace with actual image ID
+		imageId = "rbxassetid://73449632309262",
 		boosterType = Boosters.BoosterTypes.PLAYER,
 		duration = 300, -- 5 minutes in seconds
 		stacks = false,
@@ -111,7 +111,7 @@ Boosters.Boosters = {
 	},
 
 	Fuel = {
-		name = "Rocket Fuel",
+		name = "Fuel",
 		description = "Doubles tycoon income for 10 minutes",
 		imageId = "rbxassetid://7123456792", -- Replace with actual image ID
 		boosterType = Boosters.BoosterTypes.TYCOON,
@@ -136,9 +136,9 @@ Boosters.Boosters = {
 	},
 
 	Bugs = {
-		name = "Glitch Bug",
+		name = "Bug",
 		description = "Applies a glitch effect to your dice for 30 minutes",
-		imageId = "rbxassetid://7123456793", -- Replace with actual image ID
+		imageId = "rbxassetid://109760311419104",
 		boosterType = Boosters.BoosterTypes.DICE,
 		duration = 1800, -- 30 minutes in seconds
 		stacks = false,
@@ -171,8 +171,46 @@ Boosters.Boosters = {
 				end
 			end
 		end
-	}
+	},
 
+	Pearls = {
+		name = "Pearls",
+		description = "Applies a glitch effect to your dice for 30 minutes",
+		imageId = "rbxassetid://109760311419104z",
+		boosterType = Boosters.BoosterTypes.DICE,
+		duration = 1800, -- 30 minutes in seconds
+		stacks = false,
+		canCancel = true,
+
+		onActivate = function(player)
+			-- This function only runs on the server
+			if not IsServer then return function() end end
+
+			-- Get player's dice inventory
+			local diceInventory = player:FindFirstChild("DiceInventory")
+			local affectedDice = {}
+
+			-- Apply effect to all dice
+			if diceInventory then
+				for _, die in ipairs(diceInventory:GetChildren()) do
+					if die:IsA("BasePart") and die:GetAttribute("IsDie") then
+						die:SetAttribute("GlitchEffect", true)
+						table.insert(affectedDice, die)
+					end
+				end
+			end
+
+			-- Return cleanup function
+			return function()
+				for _, die in ipairs(affectedDice) do
+					if die and die.Parent then
+						die:SetAttribute("GlitchEffect", false)
+					end
+				end
+			end
+		end
+	},
+	
 	-- Add more boosters here with the same structure
 }
 
