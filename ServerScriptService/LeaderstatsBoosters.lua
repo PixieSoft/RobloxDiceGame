@@ -3,11 +3,11 @@
 -- Uses the Boosters module to determine which boosters to display
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService") 
 local Players = game:GetService("Players")
 
 local Stat = require(ReplicatedStorage.Stat)
-local Boosters = require(ServerScriptService.Modules.Core.Boosters)
+-- Fix: Update the path to the Boosters module from ServerScriptService to ReplicatedStorage
+local Boosters = require(ReplicatedStorage.Modules.Core.Boosters)
 
 Players.PlayerAdded:Connect(function(Player)
 	if not Stat.WaitForLoad(Player) then return end -- player left before data loaded!

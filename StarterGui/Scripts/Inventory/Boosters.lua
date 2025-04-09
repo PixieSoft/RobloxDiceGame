@@ -11,6 +11,7 @@ local player = Players.LocalPlayer
 -- First, let's make sure we have the module loaded
 local BoosterInventory
 local success, result = pcall(function()
+	-- Updated path - now looking in ReplicatedStorage instead of ServerScriptService
 	return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Core"):WaitForChild("BoosterInventory"))
 end)
 
@@ -92,7 +93,6 @@ local function findInventoryButton()
 				if (button:IsA("TextButton") or button:IsA("ImageButton")) and 
 					(button.Name:lower():find("inventory") or 
 						(button:IsA("TextButton") and button.Text:lower():find("inventory"))) then
-					print("Found inventory button:", button:GetFullName())
 					return button
 				end
 			end
@@ -123,7 +123,6 @@ local function findInventoryButton()
 		corner.CornerRadius = UDim.new(0, 8)
 		corner.Parent = button
 
-		print("Created new inventory button")
 		return button
 	end
 
@@ -143,7 +142,6 @@ task.delay(1, function()
 	local inventoryButton = findInventoryButton()
 	if inventoryButton then
 		inventoryButton.MouseButton1Click:Connect(ToggleInventory)
-		print("Connected inventory button")
 	else
 		warn("Could not find or create inventory button")
 	end

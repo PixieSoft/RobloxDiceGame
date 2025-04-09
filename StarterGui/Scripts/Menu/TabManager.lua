@@ -69,7 +69,7 @@ updateButtonColor = function(button, tabContainer, isActive)
 	end
 end
 
--- Function to handle side tab selection
+-- Find and modify the selectSideTab function (or add this code near it)
 selectSideTab = function(topTabName, sideTabName)
 	-- Find the side tab frame
 	local topTabFrame = SideTabs:FindFirstChild(topTabName)
@@ -89,6 +89,31 @@ selectSideTab = function(topTabName, sideTabName)
 		local contentFrame = contentReference.Value
 		if contentFrame and (contentFrame:IsA("Frame") or contentFrame:IsA("ScrollingFrame")) then
 			contentFrame.Visible = true
+
+			-- NEW CODE: Initialize BoosterInventory when the Boosters tab is selected
+			if topTabName == "Items" and sideTabName == "Boosters" then
+				print("Boosters tab selected - ensuring BoosterInventory is initialized")
+
+				-- Wait a tiny bit to make sure UI is fully loaded
+				task.spawn(function()
+					-- Require the BoosterInventory module
+					local success, BoosterInventory = pcall(function()
+						return require(ReplicatedStorage.Modules.Core.BoosterInventory)
+					end)
+
+					if success and BoosterInventory then
+						-- Initialize the module with the main UI reference
+						print("Calling BoosterInventory.Initialize with MainUI reference")
+						BoosterInventory.Initialize(Menu)
+
+						-- Refresh the inventory after initialization
+						print("Refreshing inventory after initialization")
+						BoosterInventory.Refresh()
+					else
+						warn("Failed to load BoosterInventory module: " .. tostring(BoosterInventory))
+					end
+				end)
+			end
 		end
 	else
 		print("Warning: No Content reference found for side tab:", sideTabName)

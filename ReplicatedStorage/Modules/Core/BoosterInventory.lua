@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Module references
 local BoosterInfo = nil -- Will be assigned later if we can find a Boosters module
 local success, boosters = pcall(function()
-	return require(game:GetService("ServerScriptService").Modules.Core.Boosters)
+	return require(ReplicatedStorage.Modules.Core.Boosters)
 end)
 
 if success then
@@ -24,6 +24,10 @@ local SLOT_PADDING = 10 -- Padding between slots
 -- Cache
 local player = Players.LocalPlayer
 local mainUI = nil -- Will be set in Initialize
+local contentFrame = nil -- Reference to the Content frame
+local boostersFrame = nil -- Reference to the BoosterInventory frame
+local boostersContainer = nil -- Reference to the Boosters container inside BoosterInventory
+local template = nil -- Reference to the Template
 
 -- Private functions
 
@@ -54,15 +58,15 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, timeLeft)
 	local details = GetBoosterDetails(boosterName)
 
 	-- Update name label
-	local nameLabel = boosterSlot:FindFirstChild("QtyLabel")
+	local nameLabel = boosterSlot:FindFirstChild("Qty")
 	if nameLabel then
 		nameLabel.Text = details.name .. " x" .. count
 	end
 
 	-- Update image if available
-	local imageButton = boosterSlot:FindFirstChild("ImageButton")
-	if imageButton and details.imageId ~= "" then
-		imageButton.Image = details.imageId
+	local imageFrame = boosterSlot:FindFirstChild("Image")
+	if imageFrame and details.imageId ~= "" then
+		imageFrame.Image = details.imageId
 	end
 
 	-- Add tooltip with description if needed
@@ -137,8 +141,53 @@ end
 -- Public functions
 
 -- Initialize the module with references to UI elements
-function BoosterInventory.Initialize(mainUIReference)
-	mainUI = mainUIReference
+function BoosterInventory.Initialize(menuUI)
+	print("BoosterInventory.Initialize called with UI:", menuUI.Name)
+
+	mainUI = menuUI
+
+	-- Find the Main frame within Menu
+	local mainFrame = mainUI:FindFirstChild("Main")
+	if not mainFrame then
+		warn("Main frame not found in Menu")
+		return
+	end
+	print("Found Main frame")
+
+	-- Find the Content frame within Main
+	contentFrame = mainFrame:FindFirstChild("Content")
+	if not contentFrame then
+		warn("Content frame not found in Main")
+		return
+	end
+	print("Found Content frame")
+
+	-- Find the BoosterInventory frame within Content
+	boostersFrame = contentFrame:FindFirstChild("BoosterInventory")
+	if not boostersFrame then
+		warn("BoosterInventory frame not found in Content")
+		return
+	end
+	print("Found BoosterInventory frame")
+
+	-- Find the Boosters container within BoosterInventory
+	boostersContainer = boostersFrame:FindFirstChild("Boosters")
+	if not boostersContainer then
+		warn("Boosters container not found in BoosterInventory")
+		return
+	end
+	print("Found Boosters container")
+
+	-- Find the Template within Boosters container
+	template = boostersContainer:FindFirstChild("Template")
+	if not template then
+		warn("Template not found in Boosters container")
+		return
+	end
+	print("Found Template:", template.Name)
+
+	-- Make sure Template is invisible
+	template.Visible = false
 
 	-- Make sure BoosterEvents exists
 	local boosterEvents = ReplicatedStorage:FindFirstChild("BoosterEvents")
@@ -180,149 +229,140 @@ function BoosterInventory.Initialize(mainUIReference)
 		end)
 	end
 
+	print("BoosterInventory initialization complete")
 	return BoosterInventory
 end
 
 -- Populate the booster inventory with slots
 function BoosterInventory.Populate()
+	print("BoosterInventory.Populate called")
+
 	if not mainUI then
 		warn("BoosterInventory not initialized properly. Call Initialize first.")
-		return
+		return 0
 	end
 
-	-- Find the Boosters container
-	local content = mainUI:FindFirstChild("Content")
-	if not content then
-		warn("Content frame not found in mainUI")
-		return
+	if not boostersContainer then
+		warn("Boosters container not found. Make sure initialization was successful.")
+		return 0
 	end
 
-	local boostersFrame = content:FindFirstChild("Boosters")
-	if not boostersFrame then
-		warn("Boosters frame not found in Content")
-		return
-	end
-
-	-- Find the template using the ObjectValue reference
-	local templateRef = boostersFrame:FindFirstChild("Template")
-	if not templateRef or not templateRef:IsA("ObjectValue") or not templateRef.Value then
-		warn("Template reference not found or invalid")
-		return
-	end
-
-	local template = templateRef.Value
 	if not template then
-		warn("Template not found")
-		return
+		warn("Template not found. Make sure initialization was successful.")
+		return 0
+		}
+
+		print("Found boostersContainer:", boostersContainer.Name)
+print("Template ready for cloning")
+
+-- Clear existing booster slots (except the template)
+for _, child in ipairs(boostersContainer:GetChildren()) do
+	if child:IsA("Frame") and child ~= template and child:GetAttribute("IsTemplate") ~= true then
+		child:Destroy()
+	end
+end
+
+-- Get player's boosters from leaderstats
+local leaderstats = player:FindFirstChild("leaderstats")
+if not leaderstats then
+	warn("leaderstats not found for player")
+	return 0
+end
+
+local boostersFolder = leaderstats:FindFirstChild("Boosters")
+if not boostersFolder then
+	warn("Boosters folder not found in leaderstats")
+	return 0
+end
+
+print("Found leaderstats.Boosters folder")
+
+-- Get active boosters (if any)
+local activeBoosters = {}
+for _, child in ipairs(boostersFolder:GetChildren()) do
+	if child.Name:match("_Active$") then
+		local baseName = child.Name:gsub("_Active$", "")
+		activeBoosters[baseName] = child.Value -- Store time left
+	end
+end
+
+-- Group boosters by name (excluding active indicators)
+local boosters = {}
+local boosterCount = 0
+for _, child in ipairs(boostersFolder:GetChildren()) do
+	if not child.Name:match("_Active$") then
+		boosters[child.Name] = child.Value
+		boosterCount = boosterCount + 1
+	end
+end
+
+print("Found", boosterCount, "boosters in leaderstats")
+
+-- Get UIGridLayout for positioning or create if it doesn't exist
+local gridLayout = boostersContainer:FindFirstChild("BoosterLayout")
+if not gridLayout then
+	gridLayout = Instance.new("UIGridLayout")
+	gridLayout.Name = "BoosterLayout"
+	gridLayout.CellSize = UDim2.new(0.5, -5, 0, SLOT_HEIGHT)
+	gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
+	gridLayout.SortOrder = Enum.SortOrder.Name
+	gridLayout.Parent = boostersContainer
+end
+
+-- Create slots for each booster
+local count = 0
+for boosterName, boosterCount in pairs(boosters) do
+	-- Skip if count is 0
+	if boosterCount <= 0 then
+		continue
 	end
 
-	-- Make sure template is invisible
-	template.Visible = false
+	-- Clone the template
+	local newSlot = template:Clone()
+	newSlot.Name = "BoosterSlot_" .. boosterName
+	newSlot.Visible = true
+	newSlot:SetAttribute("IsTemplate", false)
 
-	-- Clear existing booster slots (except the template)
-	for _, child in ipairs(boostersFrame:GetChildren()) do
-		if child:IsA("Frame") and child ~= template and child:GetAttribute("IsTemplate") ~= true then
-			child:Destroy()
-		end
-	end
+	-- Get time left if active
+	local timeLeft = activeBoosters[boosterName]
 
-	-- Get player's boosters from leaderstats
-	local leaderstats = player:FindFirstChild("leaderstats")
-	if not leaderstats then
-		warn("leaderstats not found for player")
-		return
-	end
+	-- Update the slot with booster info
+	UpdateBoosterSlot(newSlot, boosterName, boosterCount, timeLeft)
 
-	local boostersFolder = leaderstats:FindFirstChild("Boosters")
-	if not boostersFolder then
-		warn("Boosters folder not found in leaderstats")
-		return
-	end
+	-- Parent to the container
+	newSlot.Parent = boostersContainer
+	count = count + 1
 
-	-- Get active boosters (if any)
-	local activeBoosters = {}
-	for _, child in ipairs(boostersFolder:GetChildren()) do
-		if child.Name:match("_Active$") then
-			local baseName = child.Name:gsub("_Active$", "")
-			activeBoosters[baseName] = child.Value -- Store time left
-		end
-	end
+	print("Created slot for", boosterName, "with count", boosterCount)
+end
 
-	-- Group boosters by name (excluding active indicators)
-	local boosters = {}
-	for _, child in ipairs(boostersFolder:GetChildren()) do
-		if not child.Name:match("_Active$") then
-			boosters[child.Name] = child.Value
-		end
-	end
+-- Update canvas size if using a ScrollingFrame
+if boostersContainer:IsA("ScrollingFrame") then
+	local rows = math.ceil(count / 2) -- Assuming 2 columns in grid
+	boostersContainer.CanvasSize = UDim2.new(0, 0, 0, rows * (SLOT_HEIGHT + SLOT_PADDING))
+end
 
-	-- Get UIGridLayout for positioning
-	local gridLayout = boostersFrame:FindFirstChild("UIGridLayout")
-	if not gridLayout then
-		gridLayout = Instance.new("UIGridLayout")
-		gridLayout.Name = "UIGridLayout"
-		gridLayout.CellSize = UDim2.new(0.5, -5, 0, SLOT_HEIGHT)
-		gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
-		gridLayout.SortOrder = Enum.SortOrder.Name
-		gridLayout.Parent = boostersFrame
-	end
-
-	-- Create slots for each booster
-	local count = 0
-	for boosterName, boosterCount in pairs(boosters) do
-		-- Skip if count is 0
-		if boosterCount <= 0 then
-			continue
-		end
-
-		-- Clone the template
-		local newSlot = template:Clone()
-		newSlot.Name = "BoosterSlot_" .. boosterName
-		newSlot.Visible = true
-		newSlot:SetAttribute("IsTemplate", false)
-
-		-- Get time left if active
-		local timeLeft = activeBoosters[boosterName]
-
-		-- Update the slot with booster info
-		UpdateBoosterSlot(newSlot, boosterName, boosterCount, timeLeft)
-
-		-- Parent to the container
-		newSlot.Parent = boostersFrame
-		count = count + 1
-	end
-
-	-- Update canvas size if using a ScrollingFrame
-	if boostersFrame:IsA("ScrollingFrame") then
-		local rows = math.ceil(count / 2) -- Assuming 2 columns in grid
-		boostersFrame.CanvasSize = UDim2.new(0, 0, 0, rows * (SLOT_HEIGHT + SLOT_PADDING))
-	end
-
-	return count
+print("Populated inventory with", count, "booster slots")
+return count
 end
 
 -- Refresh the booster inventory (repopulate)
 function BoosterInventory.Refresh()
+	print("BoosterInventory.Refresh called")
 	return BoosterInventory.Populate()
 end
 
 -- Clean up connections when module is unloaded
 function BoosterInventory.Cleanup()
 	-- Find all booster slots and disconnect their events
-	if mainUI then
-		local content = mainUI:FindFirstChild("Content")
-		if content then
-			local boostersFrame = content:FindFirstChild("Boosters")
-			if boostersFrame then
-				for _, slot in ipairs(boostersFrame:GetChildren()) do
-					if slot.Name:match("^BoosterSlot") then
-						local useButton = slot:FindFirstChild("Use")
-						if useButton then
-							local connection = useButton:GetAttribute("ClickConnection")
-							if connection then
-								connection:Disconnect()
-							end
-						end
+	if boostersContainer then
+		for _, slot in ipairs(boostersContainer:GetChildren()) do
+			if slot.Name:match("^BoosterSlot") then
+				local useButton = slot:FindFirstChild("Use")
+				if useButton then
+					local connection = useButton:GetAttribute("ClickConnection")
+					if connection then
+						connection:Disconnect()
 					end
 				end
 			end
