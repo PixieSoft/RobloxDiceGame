@@ -7,6 +7,7 @@ local Boosters = {}
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 local RunService = game:GetService("RunService")
 
 -- Check if this is running on the server or client
@@ -20,34 +21,41 @@ Boosters.BoosterTypes = {
 }
 
 -- Booster definitions with all properties
-Boosters.Boosters = {
-	LightCrystals = {
+Boosters.Items = {
+	Crystals = {
 		name = "Crystal",
-		description = "Increases player speed by 25% for 3 minutes",
+		description = "Shrink for 10s per crystal used.",
 		imageId = "rbxassetid://72049224483385",
-		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 180, -- 3 minutes in seconds
-		stacks = false,
-		canCancel = true,
+		type = Boosters.BoosterTypes.PLAYER,
+		duration = 10, -- 10 seconds per item used
+		stacks = false, -- effect does not stack
+		canCancel = true, -- can be canceled by player
 
 		-- Function that runs when booster is activated
-		onActivate = function(player)
+		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
+			
+			-- DEBUG
+			print("Using " .. qty .. " " .. Boosters.Items.Crystals.name)
 
-			-- Get character and increase walk speed
+			-- Require PlayerSizeToggle module
+			local PlayerSizeToggle = require(ServerScriptService.Modules.Effects.PlayerSizeToggle)
+
+			-- Get character
 			local character = player.Character or player.CharacterAdded:Wait()
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
-
+			
+			-- Toggle the player size
 			if humanoid then
-				local originalSpeed = humanoid.WalkSpeed
-				humanoid.WalkSpeed = originalSpeed * 1.25
-
+				PlayerSizeToggle.TogglePlayerSize(player)
+				
 				-- Return cleanup function that will run when effect ends or is canceled
 				return function()
 					-- Make sure character still exists
 					if character and character.Parent and humanoid and humanoid.Parent then
-						humanoid.WalkSpeed = originalSpeed
+						-- Restore player size
+						PlayerSizeToggle.TogglePlayerSize(player)
 					end
 				end
 			end
@@ -58,47 +66,70 @@ Boosters.Boosters = {
 
 	Mushrooms = {
 		name = "Mushroom",
-		description = "Allows player to jump 50% higher for 2 minutes",
+		description = "+1% jump height for 1 minute per mushroom",
 		imageId = "rbxassetid://134097767361051",
 		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 120, -- 2 minutes in seconds
-		stacks = false,
+		duration = 60, -- 1 minute in seconds
+		stacks = true, -- Allow multiple mushrooms to stack
 		canCancel = true,
 
-		onActivate = function(player)
+		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
+
+			-- DEBUG
+			print("Using " .. qty .. " " .. Boosters.Items.Mushrooms.name)
+
+			-- Determine how many mushrooms the player has used
+			local Stat = require(game.ReplicatedStorage.Stat)
+			local mushroomStat = Stat.Get(player, "Mushrooms")
+			local mushroomCount = mushroomStat.Value
 
 			local character = player.Character or player.CharacterAdded:Wait()
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
 
 			if humanoid then
-				local originalJumpPower = humanoid.JumpPower
-				humanoid.JumpPower = originalJumpPower * 1.5
+				-- Original jump height before modification
+				local originalJumpHeight = humanoid.JumpHeight
 
+				-- Calculate new jump height (1% increase per mushroom)
+				local jumpHeightMultiplier = 1 + (mushroomCount * 0.01)
+				local newJumpHeight = originalJumpHeight * jumpHeightMultiplier
+
+				-- Apply the new jump height
+				humanoid.JumpHeight = newJumpHeight
+
+				print(string.format("Mushroom Boost: %d mushrooms increased jump height from %.2f to %.2f", 
+					mushroomCount, originalJumpHeight, newJumpHeight))
+
+				-- Return cleanup function that will reset jump height when booster expires
 				return function()
+					-- Make sure character still exists
 					if character and character.Parent and humanoid and humanoid.Parent then
-						humanoid.JumpPower = originalJumpPower
+						humanoid.JumpHeight = originalJumpHeight
 					end
 				end
 			end
 
-			return function() end
+			return function() end -- Return empty cleanup if no humanoid found
 		end
 	},
 
 	LavaBalls = {
 		name = "Lava Ball",
-		description = "Grants immunity to fire damage for 5 minutes",
+		description = "Drops a block under your feet for 5s. Using 10 doubles the size. Using 100 triples the size.",
 		imageId = "rbxassetid://73449632309262",
 		boosterType = Boosters.BoosterTypes.PLAYER,
 		duration = 300, -- 5 minutes in seconds
 		stacks = false,
 		canCancel = true,
 
-		onActivate = function(player)
+		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
+
+			-- DEBUG
+			print("Using " .. qty .. " " .. Boosters.Items.LavaBalls.name)
 
 			-- Set a player attribute to track fire immunity
 			player:SetAttribute("FireImmune", true)
@@ -112,25 +143,21 @@ Boosters.Boosters = {
 
 	Fuel = {
 		name = "Fuel",
-		description = "Doubles tycoon income for 10 minutes",
+		description = "Fills your fuel gauge for transportation.",
 		imageId = "rbxassetid://7123456792", -- Replace with actual image ID
-		boosterType = Boosters.BoosterTypes.TYCOON,
-		duration = 600, -- 10 minutes in seconds
-		stacks = true, -- Multiple fuel boosters can stack
-		canCancel = false, -- Cannot be canceled once activated
+		boosterType = Boosters.BoosterTypes.PLAYER,
+		stacks = false, -- Cannot stack, simply fills the gauge
+		canCancel = false, -- Nothing to cancel
 
-		onActivate = function(player)
+		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
-
-			-- Set multiplier attribute on player
-			local currentMultiplier = player:GetAttribute("IncomeMultiplier") or 1
-			player:SetAttribute("IncomeMultiplier", currentMultiplier * 2)
+			
+			-- Fill the fuel gauge
+			print("Using " .. qty .. " " .. Boosters.Items.Fuel.name)
 
 			-- Return cleanup function
 			return function()
-				local multiplier = player:GetAttribute("IncomeMultiplier") or 2
-				player:SetAttribute("IncomeMultiplier", multiplier / 2)
 			end
 		end
 	},
@@ -144,9 +171,12 @@ Boosters.Boosters = {
 		stacks = false,
 		canCancel = true,
 
-		onActivate = function(player)
+		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
+
+			-- DEBUG
+			print("Using " .. qty .. " " .. Boosters.Items.Bugs.name)
 
 			-- Get player's dice inventory
 			local diceInventory = player:FindFirstChild("DiceInventory")
@@ -185,6 +215,9 @@ Boosters.Boosters = {
 		onActivate = function(player)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
+
+			-- DEBUG
+			print("Using " .. qty .. " " .. Boosters.Items.Pearls.name)
 
 			-- Get player's dice inventory
 			local diceInventory = player:FindFirstChild("DiceInventory")
