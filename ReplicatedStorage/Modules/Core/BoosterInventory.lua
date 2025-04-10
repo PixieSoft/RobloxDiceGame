@@ -14,7 +14,7 @@ local success, boosters = pcall(function()
 end)
 
 if success then
-	BoosterInfo = boosters.Boosters
+	BoosterInfo = boosters.Items
 end
 
 -- Constants

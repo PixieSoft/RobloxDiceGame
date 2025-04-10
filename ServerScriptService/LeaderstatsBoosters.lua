@@ -28,7 +28,7 @@ Players.PlayerAdded:Connect(function(Player)
 	boostersFolder.Parent = Player.leaderstats
 
 	-- Create values for each booster type from the Boosters module
-	for boosterName, boosterInfo in pairs(Boosters.Boosters) do
+	for boosterName, boosterInfo in pairs(Boosters.Items) do
 		local boosterStat = Stat.Get(Player, boosterName)
 
 		if boosterStat then

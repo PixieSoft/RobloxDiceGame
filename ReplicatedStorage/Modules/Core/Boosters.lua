@@ -278,7 +278,7 @@ if IsServer then
 		end
 
 		-- Create stats for each booster type
-		for boosterName, _ in pairs(Boosters.Boosters) do
+		for boosterName, boosterInfo in pairs(Boosters.Items) do
 			local boosterStat = Stat.Get(player, boosterName)
 
 			if not boosterStat then
@@ -297,7 +297,7 @@ if IsServer then
 
 	-- Function to activate a booster for a player
 	function Boosters.ActivateBooster(player, boosterName)
-		local booster = Boosters.Boosters[boosterName]
+		local booster = Boosters.Items[boosterName]
 		if not booster then
 			warn("Attempted to activate unknown booster:", boosterName)
 			return false
@@ -358,7 +358,7 @@ if IsServer then
 	function Boosters.GiveBooster(player, boosterName, amount)
 		amount = amount or 1
 
-		if not Boosters.Boosters[boosterName] then
+		if not Boosters.Items[boosterName] then
 			warn("Attempted to give unknown booster:", boosterName)
 			return false
 		end
@@ -388,7 +388,7 @@ if IsServer then
 			return false
 		end
 
-		local booster = Boosters.Boosters[boosterName]
+		local booster = Boosters.Items[boosterName]
 		if not booster.canCancel and os.time() < Boosters.ActiveBoosters[player.UserId][boosterName].expirationTime then
 			-- Cannot cancel non-cancelable boosters before they expire
 			return false
@@ -501,8 +501,13 @@ if IsServer then
 		-- Connect UseBooster event to activation function
 		local useBoosterEvent = BoosterEvents:FindFirstChild("UseBooster")
 		if useBoosterEvent then
-			useBoosterEvent.OnServerEvent:Connect(function(player, boosterName)
-				Boosters.ActivateBooster(player, boosterName)
+			useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, count)
+				count = count or 1 -- Default to 1 if no count provided
+				for i = 1, count do
+					if not Boosters.ActivateBooster(player, boosterName) then
+						break -- Stop if activation fails (e.g., player ran out)
+					end
+				end
 			end)
 		end
 
