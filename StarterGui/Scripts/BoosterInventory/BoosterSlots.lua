@@ -1,4 +1,4 @@
--- /StarterGui/Inventory/Boosters.lua
+-- /StarterGui/BoosterInventory/BoosterSlots.lua
 -- LocalScript that initializes and manages the booster inventory UI
 -- This script connects to the BoosterInventory module to populate the UI with booster slots
 
