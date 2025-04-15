@@ -13,6 +13,15 @@ local RunService = game:GetService("RunService")
 -- Check if this is running on the server or client
 local IsServer = RunService:IsServer()
 
+local function getBoosterNameFromFunction(func)
+	for name, item in pairs(Boosters.Items) do
+		if item.onActivate == func then
+			return name
+		end
+	end
+	return "unknown booster"
+end
+
 -- Booster Types for categorization
 Boosters.BoosterTypes = {
 	PLAYER = "PlayerBoost", -- Affects player character
@@ -38,6 +47,7 @@ Boosters.Items = {
 
 			-- DEBUG
 			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
+			return true
 		end
 	},
 
@@ -56,7 +66,8 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Mushrooms.name)
+			return true
 		end
 	},
 
@@ -75,7 +86,8 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.LavaBalls.name)
+			return true
 		end
 	},
 
@@ -93,7 +105,8 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Fuel.name)
+			return true
 		end
 	},
 
@@ -112,7 +125,8 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Bugs.name)
+			return true
 		end
 	},
 
@@ -131,7 +145,8 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Pearls.name)
+			return true
 		end
 	},
 	

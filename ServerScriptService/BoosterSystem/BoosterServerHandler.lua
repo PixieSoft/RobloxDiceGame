@@ -47,7 +47,8 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		return
 	end
 
-	quantity = quantity or 1
+	-- THE FIX: Make sure quantity is a number and has a default value
+	quantity = tonumber(quantity) or 1
 	if quantity <= 0 then 
 		warn("Invalid quantity: " .. tostring(quantity))
 		return
@@ -82,7 +83,7 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		end)
 
 		if success then
-			print("Successfully activated " .. boosterName)
+			print("Successfully activated " .. boosterName .. " with quantity " .. quantity)
 
 			-- Deduct boosters from player's count
 			boosterStat.Value = boosterStat.Value - quantity
