@@ -54,7 +54,7 @@ end)
 game:GetService("RunService").Heartbeat:Connect(function()
 	for _, player in ipairs(Players:GetPlayers()) do
 		local boostersFolder = player:FindFirstChild("leaderstats") and 
-			player.leaderstats:FindFirstChild("Boosters")
+			player.leaderstats:FindFirstChild("Boosters") 
 
 		if boostersFolder then
 			local activeBoosters = Boosters.GetActiveBoosters(player)

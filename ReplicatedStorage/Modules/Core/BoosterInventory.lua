@@ -8,14 +8,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Module references
-local BoosterInfo = nil -- Will be assigned later if we can find a Boosters module
-local success, boosters = pcall(function()
-	return require(ReplicatedStorage.Modules.Core.Boosters)
-end)
-
-if success then
-	BoosterInfo = boosters.Items
-end
+local Boosters = require(ReplicatedStorage.Modules.Core.Boosters)
+local Stat = require(ReplicatedStorage.Stat)
 
 -- Constants
 local SLOT_HEIGHT = 100 -- Height of each booster slot
@@ -29,106 +23,194 @@ local boostersFrame = nil -- Reference to the BoosterInventory frame
 local boostersContainer = nil -- Reference to the Boosters container inside BoosterInventory
 local template = nil -- Reference to the Template
 
--- Private functions
+-- Use a metadata table to store button connections instead of attributes
+local buttonConnections = {}
 
--- Get the proper name and description for a booster
-local function GetBoosterDetails(boosterName)
-	-- Default values
-	local displayName = boosterName
-	local description = "No description available"
-	local imageId = ""
-
-	-- Try to get info from the Boosters module if available
-	if BoosterInfo and BoosterInfo[boosterName] then
-		displayName = BoosterInfo[boosterName].name or displayName
-		description = BoosterInfo[boosterName].description or description
-		imageId = BoosterInfo[boosterName].imageId or ""
+-- Helper function to clean up connections for a button
+local function cleanupButtonConnection(button)
+	if buttonConnections[button] then
+		buttonConnections[button]:Disconnect()
+		buttonConnections[button] = nil
 	end
-
-	return {
-		name = displayName,
-		description = description,
-		imageId = imageId
-	}
 end
 
--- Update a booster slot with the given data
-local function UpdateBoosterSlot(boosterSlot, boosterName, count, timeLeft)
-	-- Get booster details
-	local details = GetBoosterDetails(boosterName)
+-- Private functions
 
-	-- Update Quantity (Qty) label
-	local qtyLabel = boosterSlot:FindFirstChild("Qty")
-	if qtyLabel then
-		qtyLabel.Text = tostring(count)
+-- Update a booster slot with the given data
+local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
+	-- Get the booster info from the Boosters module
+	local boosterInfo = Boosters.Items[boosterName]
+	if not boosterInfo then
+		warn("Booster info not found for: " .. boosterName)
+		return boosterSlot
+	end
+
+	-- Update name and description if they exist
+	local nameLabel = boosterSlot:FindFirstChild("Name")
+	if nameLabel then
+		nameLabel.Text = boosterInfo.name or boosterName
+	end
+
+	local descLabel = boosterSlot:FindFirstChild("Description")
+	if descLabel then
+		descLabel.Text = boosterInfo.description or ""
 	end
 
 	-- Update image if available
 	local imageFrame = boosterSlot:FindFirstChild("Image")
-	if imageFrame and details.imageId ~= "" then
-		imageFrame.Image = details.imageId
+	if imageFrame and boosterInfo.imageId then
+		imageFrame.Image = boosterInfo.imageId
 	end
 
-	-- If there's an active timer, display it
-	if timeLeft then
-		-- Format time left (assuming timeLeft is in seconds)
-		local mins = math.floor(timeLeft / 60)
-		local secs = timeLeft % 60
-		local timeString = string.format("%02d:%02d", mins, secs)
-
-		-- Find or create active timer label
-		local activeLabel = boosterSlot:FindFirstChild("ActiveLabel")
-		if not activeLabel then
-			activeLabel = Instance.new("TextLabel")
-			activeLabel.Name = "ActiveLabel"
-			activeLabel.Size = UDim2.new(0.3, 0, 0.3, 0)
-			activeLabel.Position = UDim2.new(0.7, 0, 0, 0)
-			activeLabel.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-			activeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-			activeLabel.TextScaled = true
-			activeLabel.Font = Enum.Font.GothamBold
-			activeLabel.Parent = boosterSlot
-
-			-- Add rounded corners
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0.2, 0)
-			corner.Parent = activeLabel
-		end
-
-		activeLabel.Text = timeString
-		activeLabel.Visible = true
-	else
-		-- Hide active timer if exists
-		local activeLabel = boosterSlot:FindFirstChild("ActiveLabel")
-		if activeLabel then
-			activeLabel.Visible = false
-		end
+	-- Set count display (total - spending)
+	local countLabel = boosterSlot:FindFirstChild("Count")
+	if countLabel then
+		countLabel.Text = tostring(count - spendingValue)
 	end
 
-	-- Set up use button functionality
-	local useButton = boosterSlot:FindFirstChild("Use")
-	if useButton then
-		-- Clean up previous connections
-		local oldConnection = useButton:GetAttribute("ClickConnection")
-		if oldConnection then
-			oldConnection:Disconnect()
+	-- Set spending value
+	local spendingLabel = boosterSlot:FindFirstChild("Controls"):FindFirstChild("Spending")
+	if spendingLabel then
+		spendingLabel.Text = tostring(spendingValue)
+	end
+
+	-- Set up control buttons
+	local controls = boosterSlot:FindFirstChild("Controls")
+	if controls then
+		-- MinusOne button
+		local minusOneBtn = controls:FindFirstChild("MinusOne")
+		if minusOneBtn then
+			-- Clean up previous connection
+			cleanupButtonConnection(minusOneBtn)
+
+			-- New connection
+			local connection = minusOneBtn.MouseButton1Click:Connect(function()
+				-- Get current spending
+				local currentSpending = tonumber(spendingLabel.Text) or 0
+				if currentSpending > 0 then
+					-- Decrease spending by 1
+					local newSpending = currentSpending - 1
+					spendingLabel.Text = tostring(newSpending)
+
+					-- Update count display
+					if countLabel then
+						countLabel.Text = tostring(count - newSpending)
+					end
+				end
+			end)
+
+			-- Store connection in the metadata table
+			buttonConnections[minusOneBtn] = connection
 		end
 
-		-- Create new connection
-		local connection = useButton.Activated:Connect(function()
-			-- Find or create the UseBooster RemoteEvent
-			local boosterEvents = ReplicatedStorage:FindFirstChild("BoosterEvents")
-			local useBoosterEvent = boosterEvents and boosterEvents:FindFirstChild("UseBooster")
+		-- PlusOne button
+		local plusOneBtn = controls:FindFirstChild("PlusOne")
+		if plusOneBtn then
+			-- Clean up previous connection
+			cleanupButtonConnection(plusOneBtn)
 
-			if useBoosterEvent then
-				useBoosterEvent:FireServer(boosterName)
-			else
-				warn("UseBooster event not found in ReplicatedStorage.BoosterEvents")
-			end
-		end)
+			-- New connection
+			local connection = plusOneBtn.MouseButton1Click:Connect(function()
+				-- Get current spending
+				local currentSpending = tonumber(spendingLabel.Text) or 0
+				if currentSpending < count then
+					-- Increase spending by 1
+					local newSpending = currentSpending + 1
+					spendingLabel.Text = tostring(newSpending)
 
-		-- Store connection for cleanup
-		useButton:SetAttribute("ClickConnection", connection)
+					-- Update count display
+					if countLabel then
+						countLabel.Text = tostring(count - newSpending)
+					end
+				end
+			end)
+
+			-- Store connection in the metadata table
+			buttonConnections[plusOneBtn] = connection
+		end
+
+		-- MinusAll button
+		local minusAllBtn = controls:FindFirstChild("MinusAll")
+		if minusAllBtn then
+			-- Clean up previous connection
+			cleanupButtonConnection(minusAllBtn)
+
+			-- New connection
+			local connection = minusAllBtn.MouseButton1Click:Connect(function()
+				-- Set spending to 0
+				spendingLabel.Text = "0"
+
+				-- Update count display
+				if countLabel then
+					countLabel.Text = tostring(count)
+				end
+			end)
+
+			-- Store connection in the metadata table
+			buttonConnections[minusAllBtn] = connection
+		end
+
+		-- PlusAll button
+		local plusAllBtn = controls:FindFirstChild("PlusAll")
+		if plusAllBtn then
+			-- Clean up previous connection
+			cleanupButtonConnection(plusAllBtn)
+
+			-- New connection
+			local connection = plusAllBtn.MouseButton1Click:Connect(function()
+				-- Set spending to total count
+				spendingLabel.Text = tostring(count)
+
+				-- Update count display
+				if countLabel then
+					countLabel.Text = "0"
+				end
+			end)
+
+			-- Store connection in the metadata table
+			buttonConnections[plusAllBtn] = connection
+		end
+
+		-- Use button
+		local useBtn = controls:FindFirstChild("Use")
+		if useBtn then
+			-- Clean up previous connection
+			cleanupButtonConnection(useBtn)
+
+			-- New connection
+			local connection = useBtn.MouseButton1Click:Connect(function()
+				-- Get current spending
+				local currentSpending = tonumber(spendingLabel.Text) or 0
+				if currentSpending <= 0 then return end
+
+				-- Call the booster's onActivate function if it exists and we're on the server
+				local boosterEvents = ReplicatedStorage:FindFirstChild("BoosterEvents")
+				if boosterEvents then
+					local useBoosterEvent = boosterEvents:FindFirstChild("UseBooster")
+					if useBoosterEvent then
+						-- Fire event to server to use the booster
+						useBoosterEvent:FireServer(boosterName, currentSpending)
+
+						-- Update the spending value to min(previousSpending, newTotal)
+						local newTotal = count - currentSpending
+						local newSpending = math.min(currentSpending, newTotal)
+						spendingLabel.Text = tostring(newSpending)
+
+						-- Update count display
+						if countLabel then
+							countLabel.Text = tostring(newTotal - newSpending)
+						end
+					else
+						warn("UseBooster event not found in BoosterEvents")
+					end
+				else
+					warn("BoosterEvents folder not found in ReplicatedStorage")
+				end
+			end)
+
+			-- Store connection in the metadata table
+			buttonConnections[useBtn] = connection
+		end
 	end
 
 	return boosterSlot
@@ -148,7 +230,6 @@ function BoosterInventory.Initialize(menuUI)
 		warn("Main frame not found in Menu")
 		return
 	end
-	print("Found Main frame")
 
 	-- Find the Content frame within Main
 	contentFrame = mainFrame:FindFirstChild("Content")
@@ -156,7 +237,6 @@ function BoosterInventory.Initialize(menuUI)
 		warn("Content frame not found in Main")
 		return
 	end
-	print("Found Content frame")
 
 	-- Find the BoosterInventory frame within Content
 	boostersFrame = contentFrame:FindFirstChild("BoosterInventory")
@@ -164,7 +244,6 @@ function BoosterInventory.Initialize(menuUI)
 		warn("BoosterInventory frame not found in Content")
 		return
 	end
-	print("Found BoosterInventory frame")
 
 	-- Find the Boosters container within BoosterInventory
 	boostersContainer = boostersFrame:FindFirstChild("Boosters")
@@ -172,91 +251,59 @@ function BoosterInventory.Initialize(menuUI)
 		warn("Boosters container not found in BoosterInventory")
 		return
 	end
-	print("Found Boosters container")
 
-	-- Find the Template within Boosters container
+	-- Find the Template within Boosters container (it might be stored in an ObjectValue)
 	local templateValue = boostersContainer:FindFirstChild("Template")
-	if not templateValue or not templateValue:IsA("ObjectValue") then
-		warn("Template ObjectValue not found in Boosters container")
-		return
+	if templateValue and templateValue:IsA("ObjectValue") then
+		template = templateValue.Value
+	else
+		-- Try to find the template directly
+		template = boostersContainer:FindFirstChild("BoosterTemplate")
+		if not template then
+			warn("Template not found in Boosters container")
+			return
+		end
 	end
-
-	-- Extract the actual template frame from the ObjectValue
-	template = templateValue.Value
-	if not template or not template:IsA("Frame") then
-		warn("Invalid Template frame in ObjectValue")
-		return
-	end
-	print("Found Template:", template.Name)
 
 	-- Make sure Template is invisible
 	template.Visible = false
 
-	-- Make sure BoosterEvents exists
+	-- Set up the event to refresh UI when booster counts change
 	local boosterEvents = ReplicatedStorage:FindFirstChild("BoosterEvents")
-	if not boosterEvents then
-		boosterEvents = Instance.new("Folder")
-		boosterEvents.Name = "BoosterEvents"
-		boosterEvents.Parent = ReplicatedStorage
-
-		-- Create events if they don't exist
-		local events = {
-			"BoosterActivated",
-			"BoosterDeactivated",
-			"UseBooster"
-		}
-
-		for _, eventName in ipairs(events) do
-			if not boosterEvents:FindFirstChild(eventName) then
-				local event = Instance.new("RemoteEvent")
-				event.Name = eventName
-				event.Parent = boosterEvents
-			end
+	if boosterEvents then
+		local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated")
+		if activatedEvent then
+			activatedEvent.OnClientEvent:Connect(function(boosterName, expirationTime)
+				BoosterInventory.Refresh()
+			end)
 		end
-	end
 
-	-- Connect to booster events for updates
-	local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated")
-	if activatedEvent then
-		activatedEvent.OnClientEvent:Connect(function(boosterName, expirationTime)
-			-- Refresh inventory to show active status
-			BoosterInventory.Refresh()
-		end)
-	end
-
-	local deactivatedEvent = boosterEvents:FindFirstChild("BoosterDeactivated")
-	if deactivatedEvent then
-		deactivatedEvent.OnClientEvent:Connect(function(boosterName)
-			-- Refresh inventory to remove active status
-			BoosterInventory.Refresh()
-		end)
+		local deactivatedEvent = boosterEvents:FindFirstChild("BoosterDeactivated")
+		if deactivatedEvent then
+			deactivatedEvent.OnClientEvent:Connect(function(boosterName)
+				BoosterInventory.Refresh()
+			end)
+		end
 	end
 
 	print("BoosterInventory initialization complete")
 	return BoosterInventory
 end
 
--- Populate the booster inventory with slots
+-- Populate the inventory with booster slots
 function BoosterInventory.Populate()
-	print("BoosterInventory.Populate called")
-
-	if not mainUI then
-		warn("BoosterInventory not initialized properly. Call Initialize first.")
+	if not player or not mainUI or not boostersContainer or not template then
+		warn("BoosterInventory not properly initialized. Call Initialize first.")
 		return 0
 	end
 
-	if not boostersContainer then
-		warn("Boosters container not found. Make sure initialization was successful.")
-		return 0
+	-- Clean up existing connections before removing slots
+	for button, connection in pairs(buttonConnections) do
+		if button and connection then
+			connection:Disconnect()
+		end
 	end
-
-	if not template then
-		warn("Template not found. Make sure initialization was successful.")
-		return 0
-	end
-
-	print("Found boostersContainer:", boostersContainer.Name)
-	print("Template ready for cloning")
+	buttonConnections = {}
 
 	-- Clear existing booster slots (except the template)
 	for _, child in ipairs(boostersContainer:GetChildren()) do
@@ -265,43 +312,22 @@ function BoosterInventory.Populate()
 		end
 	end
 
-	-- Get player's boosters from leaderstats
-	local leaderstats = player:FindFirstChild("leaderstats")
-	if not leaderstats then
-		warn("leaderstats not found for player")
-		return 0
-	end
+	-- Get player's boosters from Stat module (source of truth)
+	local boosterCounts = {}
+	local spendingValues = {}
+	local count = 0
 
-	local boostersFolder = leaderstats:FindFirstChild("Boosters")
-	if not boostersFolder then
-		warn("Boosters folder not found in leaderstats")
-		return 0
-	end
-
-	print("Found leaderstats.Boosters folder")
-
-	-- Get active boosters (if any)
-	local activeBoosters = {}
-	for _, child in ipairs(boostersFolder:GetChildren()) do
-		if child.Name:match("_Active$") then
-			local baseName = child.Name:gsub("_Active$", "")
-			activeBoosters[baseName] = child.Value -- Store time left
+	-- Iterate through all defined boosters in the Boosters module
+	for boosterName in pairs(Boosters.Items) do
+		local boosterStat = Stat.Get(player, boosterName)
+		if boosterStat and boosterStat.Value > 0 then
+			boosterCounts[boosterName] = boosterStat.Value
+			spendingValues[boosterName] = 0
+			count = count + 1
 		end
 	end
 
-	-- Group boosters by name (excluding active indicators)
-	local boosters = {}
-	local boosterCount = 0
-	for _, child in ipairs(boostersFolder:GetChildren()) do
-		if not child.Name:match("_Active$") then
-			boosters[child.Name] = child.Value
-			boosterCount = boosterCount + 1
-		end
-	end
-
-	print("Found", boosterCount, "boosters in leaderstats")
-
-	-- Get UIGridLayout for positioning or create if it doesn't exist
+	-- Get or create a UIGridLayout to organize the slots
 	local gridLayout = boostersContainer:FindFirstChild("BoosterLayout")
 	if not gridLayout then
 		gridLayout = Instance.new("UIGridLayout")
@@ -312,31 +338,20 @@ function BoosterInventory.Populate()
 		gridLayout.Parent = boostersContainer
 	end
 
-	-- Create slots for each booster
-	local count = 0
-	for boosterName, boosterCount in pairs(boosters) do
-		-- Skip if count is 0
-		if boosterCount <= 0 then
-			continue
-		end
-
+	-- Create slots for each booster with count > 0
+	for boosterName, boosterCount in pairs(boosterCounts) do
 		-- Clone the template
 		local newSlot = template:Clone()
 		newSlot.Name = "BoosterSlot_" .. boosterName
 		newSlot.Visible = true
 		newSlot:SetAttribute("IsTemplate", false)
-
-		-- Get time left if active
-		local timeLeft = activeBoosters[boosterName]
+		newSlot:SetAttribute("BoosterName", boosterName)
 
 		-- Update the slot with booster info
-		UpdateBoosterSlot(newSlot, boosterName, boosterCount, timeLeft)
+		UpdateBoosterSlot(newSlot, boosterName, boosterCount, spendingValues[boosterName])
 
 		-- Parent to the container
 		newSlot.Parent = boostersContainer
-		count = count + 1
-
-		print("Created slot for", boosterName, "with count", boosterCount)
 	end
 
 	-- Update canvas size if using a ScrollingFrame
@@ -345,32 +360,23 @@ function BoosterInventory.Populate()
 		boostersContainer.CanvasSize = UDim2.new(0, 0, 0, rows * (SLOT_HEIGHT + SLOT_PADDING))
 	end
 
-	print("Populated inventory with", count, "booster slots")
 	return count
 end
 
--- Refresh the booster inventory (repopulate)
+-- Refresh the booster inventory
 function BoosterInventory.Refresh()
-	print("BoosterInventory.Refresh called")
 	return BoosterInventory.Populate()
 end
 
--- Clean up connections when module is unloaded
+-- Cleanup function to disconnect events
 function BoosterInventory.Cleanup()
-	-- Find all booster slots and disconnect their events
-	if boostersContainer then
-		for _, slot in ipairs(boostersContainer:GetChildren()) do
-			if slot.Name:match("^BoosterSlot") then
-				local useButton = slot:FindFirstChild("Use")
-				if useButton then
-					local connection = useButton:GetAttribute("ClickConnection")
-					if connection then
-						connection:Disconnect()
-					end
-				end
-			end
+	-- Clean up all stored connections
+	for button, connection in pairs(buttonConnections) do
+		if button and connection then
+			connection:Disconnect()
 		end
 	end
+	buttonConnections = {}
 end
 
 return BoosterInventory

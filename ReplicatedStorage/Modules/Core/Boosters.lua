@@ -35,32 +35,9 @@ Boosters.Items = {
 		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
-			
+
 			-- DEBUG
-			print("Using " .. qty .. " " .. Boosters.Items.Crystals.name)
-
-			-- Require PlayerSizeToggle module
-			local PlayerSizeToggle = require(ServerScriptService.Modules.Effects.PlayerSizeToggle)
-
-			-- Get character
-			local character = player.Character or player.CharacterAdded:Wait()
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			
-			-- Toggle the player size
-			if humanoid then
-				PlayerSizeToggle.TogglePlayerSize(player)
-				
-				-- Return cleanup function that will run when effect ends or is canceled
-				return function()
-					-- Make sure character still exists
-					if character and character.Parent and humanoid and humanoid.Parent then
-						-- Restore player size
-						PlayerSizeToggle.TogglePlayerSize(player)
-					end
-				end
-			end
-
-			return function() end -- Return empty cleanup if no humanoid found
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
 		end
 	},
 
@@ -73,45 +50,13 @@ Boosters.Items = {
 		stacks = true, -- Allow multiple mushrooms to stack
 		canCancel = true,
 
+		-- Function that runs when booster is activated
 		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print("Using " .. qty .. " " .. Boosters.Items.Mushrooms.name)
-
-			-- Determine how many mushrooms the player has used
-			local Stat = require(game.ReplicatedStorage.Stat)
-			local mushroomStat = Stat.Get(player, "Mushrooms")
-			local mushroomCount = mushroomStat.Value
-
-			local character = player.Character or player.CharacterAdded:Wait()
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-
-			if humanoid then
-				-- Original jump height before modification
-				local originalJumpHeight = humanoid.JumpHeight
-
-				-- Calculate new jump height (1% increase per mushroom)
-				local jumpHeightMultiplier = 1 + (mushroomCount * 0.01)
-				local newJumpHeight = originalJumpHeight * jumpHeightMultiplier
-
-				-- Apply the new jump height
-				humanoid.JumpHeight = newJumpHeight
-
-				print(string.format("Mushroom Boost: %d mushrooms increased jump height from %.2f to %.2f", 
-					mushroomCount, originalJumpHeight, newJumpHeight))
-
-				-- Return cleanup function that will reset jump height when booster expires
-				return function()
-					-- Make sure character still exists
-					if character and character.Parent and humanoid and humanoid.Parent then
-						humanoid.JumpHeight = originalJumpHeight
-					end
-				end
-			end
-
-			return function() end -- Return empty cleanup if no humanoid found
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
 		end
 	},
 
@@ -124,20 +69,13 @@ Boosters.Items = {
 		stacks = false,
 		canCancel = true,
 
+		-- Function that runs when booster is activated
 		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print("Using " .. qty .. " " .. Boosters.Items.LavaBalls.name)
-
-			-- Set a player attribute to track fire immunity
-			player:SetAttribute("FireImmune", true)
-
-			-- Return cleanup function
-			return function()
-				player:SetAttribute("FireImmune", false)
-			end
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
 		end
 	},
 
@@ -149,16 +87,13 @@ Boosters.Items = {
 		stacks = false, -- Cannot stack, simply fills the gauge
 		canCancel = false, -- Nothing to cancel
 
+		-- Function that runs when booster is activated
 		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
-			
-			-- Fill the fuel gauge
-			print("Using " .. qty .. " " .. Boosters.Items.Fuel.name)
 
-			-- Return cleanup function
-			return function()
-			end
+			-- DEBUG
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
 		end
 	},
 
@@ -171,35 +106,13 @@ Boosters.Items = {
 		stacks = false,
 		canCancel = true,
 
+		-- Function that runs when booster is activated
 		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print("Using " .. qty .. " " .. Boosters.Items.Bugs.name)
-
-			-- Get player's dice inventory
-			local diceInventory = player:FindFirstChild("DiceInventory")
-			local affectedDice = {}
-
-			-- Apply effect to all dice
-			if diceInventory then
-				for _, die in ipairs(diceInventory:GetChildren()) do
-					if die:IsA("BasePart") and die:GetAttribute("IsDie") then
-						die:SetAttribute("GlitchEffect", true)
-						table.insert(affectedDice, die)
-					end
-				end
-			end
-
-			-- Return cleanup function
-			return function()
-				for _, die in ipairs(affectedDice) do
-					if die and die.Parent then
-						die:SetAttribute("GlitchEffect", false)
-					end
-				end
-			end
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
 		end
 	},
 
@@ -212,35 +125,13 @@ Boosters.Items = {
 		stacks = false,
 		canCancel = true,
 
-		onActivate = function(player)
+		-- Function that runs when booster is activated
+		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print("Using " .. qty .. " " .. Boosters.Items.Pearls.name)
-
-			-- Get player's dice inventory
-			local diceInventory = player:FindFirstChild("DiceInventory")
-			local affectedDice = {}
-
-			-- Apply effect to all dice
-			if diceInventory then
-				for _, die in ipairs(diceInventory:GetChildren()) do
-					if die:IsA("BasePart") and die:GetAttribute("IsDie") then
-						die:SetAttribute("GlitchEffect", true)
-						table.insert(affectedDice, die)
-					end
-				end
-			end
-
-			-- Return cleanup function
-			return function()
-				for _, die in ipairs(affectedDice) do
-					if die and die.Parent then
-						die:SetAttribute("GlitchEffect", false)
-					end
-				end
-			end
+			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
 		end
 	},
 	

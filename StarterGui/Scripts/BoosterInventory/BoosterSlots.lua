@@ -1,4 +1,4 @@
--- /StarterGui/BoosterInventory/BoosterSlots.lua
+-- /StarterGui/Scripts/BoosterInventory/BoosterSlots.lua
 -- LocalScript that initializes and manages the booster inventory UI
 -- This script connects to the BoosterInventory module to populate the UI with booster slots
 
@@ -8,11 +8,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Get the player
 local player = Players.LocalPlayer
 
--- First, let's make sure we have the module loaded
+-- Wait for the player GUI to load
+local playerGui = player:WaitForChild("PlayerGui")
+local Menu = playerGui:WaitForChild("Menu", 10)
+
+if not Menu then
+	warn("Menu GUI not found after 10 seconds")
+	return
+end
+
+-- Get the BoosterInventory module
 local BoosterInventory
 local success, result = pcall(function()
-	-- Updated path - now looking in ReplicatedStorage instead of ServerScriptService
-	return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Core"):WaitForChild("BoosterInventory"))
+	return require(ReplicatedStorage.Modules.Core.BoosterInventory)
 end)
 
 if not success then
@@ -22,163 +30,141 @@ end
 BoosterInventory = result
 
 -- Wait for player data to load
-local leaderstats
 local function waitForPlayerData()
-	-- Wait for leaderstats to load
-	leaderstats = player:WaitForChild("leaderstats", 10)
-	if not leaderstats then
-		warn("Leaderstats not found after 10 seconds")
+	-- Try to get the Stat module
+	local Stat = require(ReplicatedStorage.Stat)
+	if not Stat.WaitForLoad(player) then
+		warn("Player data failed to load")
 		return false
 	end
-
-	-- Wait for boosters folder to load
-	local boostersFolder = leaderstats:WaitForChild("Boosters", 5)
-	if not boostersFolder then
-		warn("Boosters folder not found in leaderstats")
-		return false
-	end
-
 	return true
 end
 
--- Wait for UI to load
-local mainUI = script.Parent
-local content = mainUI:WaitForChild("Content")
-local boosterContainer = content:WaitForChild("Boosters")
+-- Initialize the module once data is loaded
+local function initializeInventory()
+	print("Initializing booster inventory...")
 
--- Make sure booster container starts hidden
-boosterContainer.Visible = false
+	-- Initialize the module with the Menu UI
+	BoosterInventory.Initialize(Menu)
 
--- Initialize the module once the UI is loaded
-BoosterInventory.Initialize(mainUI)
+	-- Initial population of the inventory
+	BoosterInventory.Refresh()
 
--- Function to show the inventory
-local function ShowInventory()
-	if not boosterContainer.Visible then
-		-- Make sure player data is loaded before showing
-		if not leaderstats and not waitForPlayerData() then
-			warn("Cannot show inventory - player data not loaded")
-			return
+	-- Setup event connection for Menu visibility changes
+	-- Fixed: Use Enabled instead of Visible for ScreenGui instances
+	Menu:GetPropertyChangedSignal("Enabled"):Connect(function()
+		if Menu.Enabled then
+			-- Refresh the inventory when the menu becomes visible
+			BoosterInventory.Refresh()
 		end
+	end)
 
-		-- Show and populate
-		boosterContainer.Visible = true
-		BoosterInventory.Refresh()
-	end
+	print("Booster inventory initialization complete")
 end
 
--- Function to hide the inventory
-local function HideInventory()
-	boosterContainer.Visible = false
-end
+-- Make sure player data is loaded before initializing
+if not waitForPlayerData() then
+	print("Waiting for player data to load...")
 
--- Function to toggle the inventory
-local function ToggleInventory()
-	if boosterContainer.Visible then
-		HideInventory()
-	else
-		ShowInventory()
-	end
-end
+	-- Set up a retry system
+	local attempts = 0
+	local maxAttempts = 5
 
--- Find the inventory button in the corner of the screen
-local function findInventoryButton()
-	-- Try to find the inventory button in a few common places
-
-	-- Method 1: Try to find in a dedicated UI
-	for _, screenGui in pairs(player.PlayerGui:GetChildren()) do
-		if screenGui:IsA("ScreenGui") then
-			-- Look for a button named "Inventory" or similar
-			for _, button in pairs(screenGui:GetDescendants()) do
-				if (button:IsA("TextButton") or button:IsA("ImageButton")) and 
-					(button.Name:lower():find("inventory") or 
-						(button:IsA("TextButton") and button.Text:lower():find("inventory"))) then
-					return button
-				end
-			end
+	local retryConnection
+	retryConnection = game:GetService("RunService").Heartbeat:Connect(function()
+		attempts = attempts + 1
+		if waitForPlayerData() then
+			retryConnection:Disconnect()
+			initializeInventory()
+		elseif attempts >= maxAttempts then
+			warn("Failed to load player data after " .. maxAttempts .. " attempts")
+			retryConnection:Disconnect()
 		end
-	end
-
-	-- Method 2: Create a button if none is found
-	local screenGui = player.PlayerGui:FindFirstChild("InventoryButtonGui")
-	if not screenGui then
-		screenGui = Instance.new("ScreenGui")
-		screenGui.Name = "InventoryButtonGui"
-		screenGui.ResetOnSpawn = false
-		screenGui.Parent = player.PlayerGui
-
-		local button = Instance.new("TextButton")
-		button.Name = "InventoryButton"
-		button.Text = "Inventory"
-		button.Size = UDim2.new(0, 100, 0, 40)
-		button.Position = UDim2.new(1, -110, 1, -50) -- Bottom right corner
-		button.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-		button.TextColor3 = Color3.fromRGB(255, 255, 255)
-		button.Font = Enum.Font.GothamBold
-		button.TextSize = 16
-		button.Parent = screenGui
-
-		-- Add rounded corners
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 8)
-		corner.Parent = button
-
-		return button
-	end
-
-	return nil
+		task.wait(1) -- Wait 1 second between attempts
+	end)
+else
+	-- Player data is already loaded, initialize immediately
+	initializeInventory()
 end
-
--- Wait a short time for everything to load, then connect to button
-task.delay(1, function()
-	-- First check if player data is loaded
-	if not leaderstats then
-		if not waitForPlayerData() then
-			warn("Player data failed to load")
-		end
-	end
-
-	-- Find or create the inventory button
-	local inventoryButton = findInventoryButton()
-	if inventoryButton then
-		inventoryButton.MouseButton1Click:Connect(ToggleInventory)
-	else
-		warn("Could not find or create inventory button")
-	end
-end)
 
 -- Listen for booster updates from server
 local boosterEvents = ReplicatedStorage:FindFirstChild("BoosterEvents")
-if boosterEvents then
-	local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated") 
-	if activatedEvent then
-		activatedEvent.OnClientEvent:Connect(function()
-			if boosterContainer.Visible then
-				BoosterInventory.Refresh()
-			end
-		end)
+if not boosterEvents then
+	-- Create the events folder if it doesn't exist
+	boosterEvents = Instance.new("Folder")
+	boosterEvents.Name = "BoosterEvents"
+	boosterEvents.Parent = ReplicatedStorage
+
+	-- Create standard booster events
+	local events = {
+		"BoosterActivated",
+		"BoosterDeactivated",
+		"UseBooster"
+	}
+
+	for _, eventName in ipairs(events) do
+		if not boosterEvents:FindFirstChild(eventName) then
+			local event = Instance.new("RemoteEvent")
+			event.Name = eventName
+			event.Parent = boosterEvents
+		end
 	end
 end
 
--- Auto-connect new boosters when added
+-- Connect to booster update events
+local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated")
+if activatedEvent then
+	activatedEvent.OnClientEvent:Connect(function(boosterName, expirationTime)
+		-- Refresh the inventory when a booster is activated
+		-- Fixed: Use Enabled instead of Visible for ScreenGui instances
+		if Menu.Enabled then
+			BoosterInventory.Refresh()
+		end
+	end)
+end
+
+local deactivatedEvent = boosterEvents:FindFirstChild("BoosterDeactivated")
+if deactivatedEvent then
+	deactivatedEvent.OnClientEvent:Connect(function(boosterName)
+		-- Refresh the inventory when a booster is deactivated
+		-- Fixed: Use Enabled instead of Visible for ScreenGui instances
+		if Menu.Enabled then
+			BoosterInventory.Refresh()
+		end
+	end)
+end
+
+-- Player events for leaderstats/booster changes
 player.ChildAdded:Connect(function(child)
 	if child.Name == "leaderstats" then
-		leaderstats = child
 		child.ChildAdded:Connect(function(statsChild)
 			if statsChild.Name == "Boosters" then
-				-- Connect to changes
+				-- Connect to changes in the Boosters folder
 				statsChild.ChildAdded:Connect(function()
-					if boosterContainer.Visible then
+					-- Fixed: Use Enabled instead of Visible for ScreenGui instances
+					if Menu.Enabled then
 						BoosterInventory.Refresh()
 					end
 				end)
 
 				statsChild.ChildRemoved:Connect(function()
-					if boosterContainer.Visible then
+					-- Fixed: Use Enabled instead of Visible for ScreenGui instances
+					if Menu.Enabled then
 						BoosterInventory.Refresh()
 					end
 				end)
+
+				for _, booster in ipairs(statsChild:GetChildren()) do
+					booster.Changed:Connect(function()
+						-- Fixed: Use Enabled instead of Visible for ScreenGui instances
+						if Menu.Enabled then
+							BoosterInventory.Refresh()
+						end
+					end)
+				end
 			end
 		end)
 	end
 end)
+
+print("BoosterSlots script loaded successfully")
