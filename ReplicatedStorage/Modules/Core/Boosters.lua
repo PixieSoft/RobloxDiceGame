@@ -36,7 +36,7 @@ Boosters.Items = {
 		description = "Shrink for 10s per crystal used.",
 		imageId = "rbxassetid://72049224483385",
 		type = Boosters.BoosterTypes.PLAYER,
-		duration = 10, -- 10 seconds per item used
+		duration = 1, -- 10 seconds per item used
 		stacks = false, -- effect does not stack
 		canCancel = true, -- can be canceled by player
 
@@ -46,7 +46,7 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Crystals.name)
+			print(player.Name .. " is using " .. Boosters.Items.Crystals.name)
 			return true
 		end
 	},
@@ -56,7 +56,7 @@ Boosters.Items = {
 		description = "+1% jump height for 1 minute per mushroom",
 		imageId = "rbxassetid://134097767361051",
 		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 60, -- 1 minute in seconds
+		duration = 1, -- 1 minute in seconds
 		stacks = true, -- Allow multiple mushrooms to stack
 		canCancel = true,
 
@@ -66,7 +66,7 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Mushrooms.name)
+			print(player.Name .. " is using " .. Boosters.Items.Mushrooms.name)
 			return true
 		end
 	},
@@ -76,7 +76,7 @@ Boosters.Items = {
 		description = "Drops a block under your feet for 5s. Using 10 doubles the size. Using 100 triples the size.",
 		imageId = "rbxassetid://73449632309262",
 		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 300, -- 5 minutes in seconds
+		duration = 1, -- 5 minutes in seconds
 		stacks = false,
 		canCancel = true,
 
@@ -86,7 +86,7 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.LavaBalls.name)
+			print(player.Name .. " is using " .. Boosters.Items.LavaBalls.name)
 			return true
 		end
 	},
@@ -96,6 +96,7 @@ Boosters.Items = {
 		description = "Fills your fuel gauge for transportation.",
 		imageId = "rbxassetid://7123456792", -- Replace with actual image ID
 		boosterType = Boosters.BoosterTypes.PLAYER,
+		duration = 1,
 		stacks = false, -- Cannot stack, simply fills the gauge
 		canCancel = false, -- Nothing to cancel
 
@@ -105,7 +106,7 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Fuel.name)
+			print(player.Name .. " is using " .. Boosters.Items.Fuel.name)
 			return true
 		end
 	},
@@ -115,7 +116,7 @@ Boosters.Items = {
 		description = "Applies a glitch effect to your dice for 30 minutes",
 		imageId = "rbxassetid://109760311419104",
 		boosterType = Boosters.BoosterTypes.DICE,
-		duration = 1800, -- 30 minutes in seconds
+		duration = 1, -- 30 minutes in seconds
 		stacks = false,
 		canCancel = true,
 
@@ -125,7 +126,7 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Bugs.name)
+			print(player.Name .. " is using " .. Boosters.Items.Bugs.name)
 			return true
 		end
 	},
@@ -135,7 +136,7 @@ Boosters.Items = {
 		description = "Applies a glitch effect to your dice for 30 minutes",
 		imageId = "rbxassetid://109760311419104z",
 		boosterType = Boosters.BoosterTypes.DICE,
-		duration = 1800, -- 30 minutes in seconds
+		duration = 1, -- 30 minutes in seconds
 		stacks = false,
 		canCancel = true,
 
@@ -145,11 +146,11 @@ Boosters.Items = {
 			if not IsServer then return function() end end
 
 			-- DEBUG
-			print(player .. " is using " .. qty .. " " .. Boosters.Items.Pearls.name)
+			print(player.Name .. " is using " .. Boosters.Items.Pearls.name)
 			return true
 		end
 	},
-	
+
 	-- Add more boosters here with the same structure
 }
 
