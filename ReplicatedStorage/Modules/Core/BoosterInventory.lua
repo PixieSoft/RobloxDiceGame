@@ -188,22 +188,16 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 				if boosterEvents then
 					local useBoosterEvent = boosterEvents:FindFirstChild("UseBooster")
 					if useBoosterEvent then
-						-- THE FIX: Explicitly convert the spending text to a number
+						-- Get the spending amount (explicitly convert to number)
 						local spendingAmount = tonumber(spendingLabel.Text) or 0
 
 						-- Fire event to server to use the booster with the explicit amount
+						-- Do NOT update the UI here - let the server stat changes trigger the update
 						print("Sending UseBooster event with name:", boosterName, "and quantity:", spendingAmount)
 						useBoosterEvent:FireServer(boosterName, spendingAmount)
 
-						-- Update the spending value to min(previousSpending, newTotal)
-						local newTotal = count - currentSpending
-						local newSpending = math.min(currentSpending, newTotal)
-						spendingLabel.Text = tostring(newSpending)
-
-						-- Update count display
-						if countLabel then
-							countLabel.Text = newTotal
-						end
+						-- Reset spending value to 0 after sending the event
+						spendingLabel.Text = "0"
 					else
 						warn("UseBooster event not found in BoosterEvents")
 					end
@@ -375,11 +369,11 @@ end
 -- Cleanup function to disconnect events
 function BoosterInventory.Cleanup()
 	-- Clean up all stored connections
-	--for button, connection in pairs(buttonConnections) do
-	--	if button and connection then
-	--		connection:Disconnect()
-	--	end
-	--end
+	for button, connection in pairs(buttonConnections) do
+		if button and connection then
+			connection:Disconnect()
+		end
+	end
 	buttonConnections = {}
 end
 

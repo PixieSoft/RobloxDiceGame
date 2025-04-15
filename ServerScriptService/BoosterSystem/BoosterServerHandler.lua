@@ -47,7 +47,7 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		return
 	end
 
-	-- THE FIX: Make sure quantity is a number and has a default value
+	-- Make sure quantity is a number and has a default value
 	quantity = tonumber(quantity) or 1
 	if quantity <= 0 then 
 		warn("Invalid quantity: " .. tostring(quantity))
@@ -76,27 +76,27 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		return
 	end
 
+	-- Deduct boosters from player's count FIRST to prevent double-decrement issues
+	boosterStat.Value = boosterStat.Value - quantity
+
 	-- Run the booster's onActivate function
 	if type(boosterItem.onActivate) == "function" then
-		local success, cleanupFunction = pcall(function()
+		local success, result = pcall(function()
 			return boosterItem.onActivate(player, quantity)
 		end)
 
 		if success then
 			print("Successfully activated " .. boosterName .. " with quantity " .. quantity)
 
-			-- Deduct boosters from player's count
-			boosterStat.Value = boosterStat.Value - quantity
-
 			-- If Boosters module has tracking for active boosters, use it
 			if Boosters.ActivateBooster then
 				-- Call internal Boosters system to handle activation properly
-				Boosters.ActivateBooster(player, boosterName, quantity, cleanupFunction)
+				Boosters.ActivateBooster(player, boosterName, quantity, result)
 			else
 				-- Simple tracking approach if the module doesn't have built-in tracking
 				local activationTime = os.time()
 				local duration = boosterItem.duration or 60 -- Default 60 seconds if not specified
-				local expirationTime = activationTime + duration
+				local expirationTime = os.time() + (duration * quantity)
 
 				-- Fire the client event for activation
 				local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated")
@@ -108,8 +108,11 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 				if duration and duration > 0 then
 					task.delay(duration, function()
 						-- Run cleanup function if available
-						if type(cleanupFunction) == "function" then
-							pcall(cleanupFunction)
+						if type(result) == "function" then
+							local success, errorMsg = pcall(result)
+							if not success then
+								warn("Error in cleanup function for booster", boosterName, ":", errorMsg)
+							end
 						end
 
 						-- Fire the client event for deactivation
@@ -121,10 +124,14 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 				end
 			end
 		else
-			warn("Failed to activate booster " .. boosterName .. ": " .. tostring(cleanupFunction))
+			-- If activation failed, refund the booster
+			warn("Failed to activate booster " .. boosterName .. ": " .. tostring(result))
+			boosterStat.Value = boosterStat.Value + quantity
 		end
 	else
+		-- If there's no activation function, refund the booster
 		warn("Booster " .. boosterName .. " doesn't have an onActivate function")
+		boosterStat.Value = boosterStat.Value + quantity
 	end
 end)
 

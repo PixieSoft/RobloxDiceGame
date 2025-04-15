@@ -47,7 +47,11 @@ Boosters.Items = {
 
 			-- DEBUG
 			print(player.Name .. " is using " .. Boosters.Items.Crystals.name)
-			return true
+
+			-- Return a proper cleanup function instead of a boolean
+			return function()
+				print("Cleaning up Crystal booster effect for " .. player.Name)
+			end
 		end
 	},
 
@@ -67,7 +71,11 @@ Boosters.Items = {
 
 			-- DEBUG
 			print(player.Name .. " is using " .. Boosters.Items.Mushrooms.name)
-			return true
+
+			-- Return a proper cleanup function instead of a boolean
+			return function()
+				print("Cleaning up Mushroom booster effect for " .. player.Name)
+			end
 		end
 	},
 
@@ -87,7 +95,11 @@ Boosters.Items = {
 
 			-- DEBUG
 			print(player.Name .. " is using " .. Boosters.Items.LavaBalls.name)
-			return true
+
+			-- Return a proper cleanup function instead of a boolean
+			return function()
+				print("Cleaning up LavaBalls booster effect for " .. player.Name)
+			end
 		end
 	},
 
@@ -107,7 +119,11 @@ Boosters.Items = {
 
 			-- DEBUG
 			print(player.Name .. " is using " .. Boosters.Items.Fuel.name)
-			return true
+
+			-- Return a proper cleanup function instead of a boolean
+			return function()
+				print("Cleaning up Fuel booster effect for " .. player.Name)
+			end
 		end
 	},
 
@@ -127,7 +143,11 @@ Boosters.Items = {
 
 			-- DEBUG
 			print(player.Name .. " is using " .. Boosters.Items.Bugs.name)
-			return true
+
+			-- Return a proper cleanup function instead of a boolean
+			return function()
+				print("Cleaning up Bugs booster effect for " .. player.Name)
+			end
 		end
 	},
 
@@ -147,7 +167,11 @@ Boosters.Items = {
 
 			-- DEBUG
 			print(player.Name .. " is using " .. Boosters.Items.Pearls.name)
-			return true
+
+			-- Return a proper cleanup function instead of a boolean
+			return function()
+				print("Cleaning up Pearls booster effect for " .. player.Name)
+			end
 		end
 	},
 
@@ -203,19 +227,13 @@ if IsServer then
 	end
 
 	-- Function to activate a booster for a player
-	function Boosters.ActivateBooster(player, boosterName)
+	function Boosters.ActivateBooster(player, boosterName, quantity, cleanupFunction)
+		-- Default quantity to 1 if not provided
+		quantity = quantity or 1
+
 		local booster = Boosters.Items[boosterName]
 		if not booster then
 			warn("Attempted to activate unknown booster:", boosterName)
-			return false
-		end
-
-		-- Check if player has the booster in their inventory
-		local Stat = require(game.ReplicatedStorage.Stat)
-		local boosterStat = Stat.Get(player, boosterName)
-
-		if not boosterStat or boosterStat.Value <= 0 then
-			warn("Player does not have this booster:", boosterName)
 			return false
 		end
 
@@ -230,14 +248,13 @@ if IsServer then
 			return false
 		end
 
-		-- Deduct one from player's booster count
-		boosterStat.Value = boosterStat.Value - 1
-
-		-- Run the booster's activation function
-		local cleanupFunction = booster.onActivate(player)
-
 		-- Store the active booster with its expiration time and cleanup function
-		local expirationTime = os.time() + booster.duration
+		local expirationTime = os.time() + (booster.duration * quantity)
+
+		-- Make sure cleanupFunction is actually a function or set it to an empty function
+		if type(cleanupFunction) ~= "function" then
+			cleanupFunction = function() end
+		end
 
 		Boosters.ActiveBoosters[player.UserId][boosterName] = {
 			expirationTime = expirationTime,
@@ -296,14 +313,22 @@ if IsServer then
 		end
 
 		local booster = Boosters.Items[boosterName]
+		if not booster then return false end
+
 		if not booster.canCancel and os.time() < Boosters.ActiveBoosters[player.UserId][boosterName].expirationTime then
 			-- Cannot cancel non-cancelable boosters before they expire
 			return false
 		end
 
-		-- Run cleanup function
+		-- Run cleanup function safely
 		if Boosters.ActiveBoosters[player.UserId][boosterName].cleanup then
-			Boosters.ActiveBoosters[player.UserId][boosterName].cleanup()
+			local success, errorMsg = pcall(function()
+				Boosters.ActiveBoosters[player.UserId][boosterName].cleanup()
+			end)
+
+			if not success then
+				warn("Error in cleanup function for booster", boosterName, ":", errorMsg)
+			end
 		end
 
 		-- Remove from active boosters
@@ -334,7 +359,7 @@ if IsServer then
 
 	-- Function to get all active boosters for a player
 	function Boosters.GetActiveBoosters(player)
-		if not Boosters.ActiveBoosters[player.UserId] then
+		if not player or not player.UserId or not Boosters.ActiveBoosters[player.UserId] then
 			return {}
 		end
 
@@ -353,7 +378,7 @@ if IsServer then
 
 	-- Function to check if a specific booster is active
 	function Boosters.IsBoosterActive(player, boosterName)
-		if not Boosters.ActiveBoosters[player.UserId] or
+		if not player or not player.UserId or not Boosters.ActiveBoosters[player.UserId] or
 			not Boosters.ActiveBoosters[player.UserId][boosterName] then
 			return false
 		end
@@ -364,13 +389,19 @@ if IsServer then
 
 	-- Cleanup function for when player leaves
 	function Boosters.CleanupPlayerBoosters(player)
-		if not Boosters.ActiveBoosters[player.UserId] then
+		if not player or not player.UserId or not Boosters.ActiveBoosters[player.UserId] then
 			return
 		end
 
 		for boosterName, boosterData in pairs(Boosters.ActiveBoosters[player.UserId]) do
-			if boosterData.cleanup then
-				boosterData.cleanup()
+			if boosterData.cleanup and type(boosterData.cleanup) == "function" then
+				local success, errorMsg = pcall(function()
+					boosterData.cleanup()
+				end)
+
+				if not success then
+					warn("Error in cleanup function for booster", boosterName, ":", errorMsg)
+				end
 			end
 		end
 
@@ -398,24 +429,10 @@ if IsServer then
 
 		for _, eventName in ipairs(events) do
 			if not BoosterEvents:FindFirstChild(eventName) then
-				local eventType = eventName == "UseBooster" and "RemoteEvent" or "RemoteEvent"
-				local event = Instance.new(eventType)
+				local event = Instance.new("RemoteEvent")
 				event.Name = eventName
 				event.Parent = BoosterEvents
 			end
-		end
-
-		-- Connect UseBooster event to activation function
-		local useBoosterEvent = BoosterEvents:FindFirstChild("UseBooster")
-		if useBoosterEvent then
-			useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, count)
-				count = count or 1 -- Default to 1 if no count provided
-				for i = 1, count do
-					if not Boosters.ActivateBooster(player, boosterName) then
-						break -- Stop if activation fails (e.g., player ran out)
-					end
-				end
-			end)
 		end
 
 		-- Connect player leaving to cleanup
