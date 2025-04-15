@@ -54,8 +54,6 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		return
 	end
 
-	print("Player " .. player.Name .. " is attempting to use " .. quantity .. " " .. boosterName)
-
 	-- Get the booster stat
 	local boosterStat = Stat.Get(player, boosterName)
 	if not boosterStat then
@@ -86,8 +84,6 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		end)
 
 		if success then
-			print("Successfully activated " .. boosterName .. " with quantity " .. quantity)
-
 			-- If Boosters module has tracking for active boosters, use it
 			if Boosters.ActivateBooster then
 				-- Call internal Boosters system to handle activation properly
@@ -96,7 +92,10 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 				-- Simple tracking approach if the module doesn't have built-in tracking
 				local activationTime = os.time()
 				local duration = boosterItem.duration or 60 -- Default 60 seconds if not specified
-				local expirationTime = os.time() + (duration * quantity)
+
+				-- Multiply duration by quantity to get total duration
+				local totalDuration = duration * quantity
+				local expirationTime = activationTime + totalDuration
 
 				-- Fire the client event for activation
 				local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated")
@@ -105,8 +104,8 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 				end
 
 				-- Set up expiration timer if the booster has a duration
-				if duration and duration > 0 then
-					task.delay(duration, function()
+				if totalDuration and totalDuration > 0 then
+					task.delay(totalDuration, function()
 						-- Run cleanup function if available
 						if type(result) == "function" then
 							local success, errorMsg = pcall(result)

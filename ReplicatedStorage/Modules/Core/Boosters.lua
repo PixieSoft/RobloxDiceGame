@@ -36,7 +36,7 @@ Boosters.Items = {
 		description = "Shrink for 10s per crystal used.",
 		imageId = "rbxassetid://72049224483385",
 		type = Boosters.BoosterTypes.PLAYER,
-		duration = 1, -- 10 seconds per item used
+		duration = 10, -- 10 seconds per item used
 		stacks = false, -- effect does not stack
 		canCancel = true, -- can be canceled by player
 
@@ -45,13 +45,8 @@ Boosters.Items = {
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
-			-- DEBUG
-			print(player.Name .. " is using " .. Boosters.Items.Crystals.name)
-
-			-- Return a proper cleanup function instead of a boolean
-			return function()
-				print("Cleaning up Crystal booster effect for " .. player.Name)
-			end
+			-- Return a proper cleanup function
+			return function() end
 		end
 	},
 
@@ -60,7 +55,7 @@ Boosters.Items = {
 		description = "+1% jump height for 1 minute per mushroom",
 		imageId = "rbxassetid://134097767361051",
 		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 1, -- 1 minute in seconds
+		duration = 60, -- 1 minute = 60 seconds
 		stacks = true, -- Allow multiple mushrooms to stack
 		canCancel = true,
 
@@ -69,13 +64,8 @@ Boosters.Items = {
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
-			-- DEBUG
-			print(player.Name .. " is using " .. Boosters.Items.Mushrooms.name)
-
-			-- Return a proper cleanup function instead of a boolean
-			return function()
-				print("Cleaning up Mushroom booster effect for " .. player.Name)
-			end
+			-- Return a proper cleanup function
+			return function() end
 		end
 	},
 
@@ -84,7 +74,7 @@ Boosters.Items = {
 		description = "Drops a block under your feet for 5s. Using 10 doubles the size. Using 100 triples the size.",
 		imageId = "rbxassetid://73449632309262",
 		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 1, -- 5 minutes in seconds
+		duration = 5, -- 5 seconds
 		stacks = false,
 		canCancel = true,
 
@@ -93,13 +83,8 @@ Boosters.Items = {
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
-			-- DEBUG
-			print(player.Name .. " is using " .. Boosters.Items.LavaBalls.name)
-
-			-- Return a proper cleanup function instead of a boolean
-			return function()
-				print("Cleaning up LavaBalls booster effect for " .. player.Name)
-			end
+			-- Return a proper cleanup function
+			return function() end
 		end
 	},
 
@@ -108,7 +93,7 @@ Boosters.Items = {
 		description = "Fills your fuel gauge for transportation.",
 		imageId = "rbxassetid://7123456792", -- Replace with actual image ID
 		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 1,
+		duration = 60, -- Not really a duration-based booster, but set to 60 seconds
 		stacks = false, -- Cannot stack, simply fills the gauge
 		canCancel = false, -- Nothing to cancel
 
@@ -117,13 +102,8 @@ Boosters.Items = {
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
-			-- DEBUG
-			print(player.Name .. " is using " .. Boosters.Items.Fuel.name)
-
-			-- Return a proper cleanup function instead of a boolean
-			return function()
-				print("Cleaning up Fuel booster effect for " .. player.Name)
-			end
+			-- Return a proper cleanup function
+			return function() end
 		end
 	},
 
@@ -132,7 +112,7 @@ Boosters.Items = {
 		description = "Applies a glitch effect to your dice for 30 minutes",
 		imageId = "rbxassetid://109760311419104",
 		boosterType = Boosters.BoosterTypes.DICE,
-		duration = 1, -- 30 minutes in seconds
+		duration = 10, -- Set to 10 seconds for testing (normally would be 1800 for 30 minutes)
 		stacks = false,
 		canCancel = true,
 
@@ -141,13 +121,8 @@ Boosters.Items = {
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
-			-- DEBUG
-			print(player.Name .. " is using " .. Boosters.Items.Bugs.name)
-
-			-- Return a proper cleanup function instead of a boolean
-			return function()
-				print("Cleaning up Bugs booster effect for " .. player.Name)
-			end
+			-- Return a proper cleanup function
+			return function() end
 		end
 	},
 
@@ -156,7 +131,7 @@ Boosters.Items = {
 		description = "Applies a glitch effect to your dice for 30 minutes",
 		imageId = "rbxassetid://109760311419104z",
 		boosterType = Boosters.BoosterTypes.DICE,
-		duration = 1, -- 30 minutes in seconds
+		duration = 1800, -- 30 minutes = 1800 seconds
 		stacks = false,
 		canCancel = true,
 
@@ -165,13 +140,8 @@ Boosters.Items = {
 			-- This function only runs on the server
 			if not IsServer then return function() end end
 
-			-- DEBUG
-			print(player.Name .. " is using " .. Boosters.Items.Pearls.name)
-
-			-- Return a proper cleanup function instead of a boolean
-			return function()
-				print("Cleaning up Pearls booster effect for " .. player.Name)
-			end
+			-- Return a proper cleanup function
+			return function() end
 		end
 	},
 
@@ -218,8 +188,6 @@ if IsServer then
 				newStat.Name = boosterName
 				newStat.Value = 0 -- Start with 0 boosters
 				newStat.Parent = boostersFolder
-
-				print("Created missing booster stat:", boosterName, "for player", player.Name)
 			end
 		end
 
@@ -248,8 +216,11 @@ if IsServer then
 			return false
 		end
 
+		-- Calculate total duration (base duration * quantity)
+		local totalDuration = booster.duration * quantity
+
 		-- Store the active booster with its expiration time and cleanup function
-		local expirationTime = os.time() + (booster.duration * quantity)
+		local expirationTime = os.time() + totalDuration
 
 		-- Make sure cleanupFunction is actually a function or set it to an empty function
 		if type(cleanupFunction) ~= "function" then
@@ -261,8 +232,8 @@ if IsServer then
 			cleanup = cleanupFunction
 		}
 
-		-- Setup expiration timer
-		task.delay(booster.duration, function()
+		-- Setup expiration timer with the total duration
+		task.delay(totalDuration, function()
 			Boosters.DeactivateBooster(player, boosterName)
 		end)
 
