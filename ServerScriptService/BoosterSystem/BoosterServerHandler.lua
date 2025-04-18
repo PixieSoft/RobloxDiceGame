@@ -74,63 +74,82 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		return
 	end
 
-	-- Deduct boosters from player's count FIRST to prevent double-decrement issues
-	boosterStat.Value = boosterStat.Value - quantity
+	-- Check if the booster can be activated successfully before spending resources
+	local canActivate = true
 
-	-- Run the booster's onActivate function
-	if type(boosterItem.onActivate) == "function" then
-		local success, result = pcall(function()
-			return boosterItem.onActivate(player, quantity)
-		end)
+	-- Check if this booster is already active for this player
+	if Boosters.IsBoosterActive and Boosters.IsBoosterActive(player, boosterName) then
+		warn("Booster already active: " .. boosterName)
+		canActivate = false
+		return -- Early return to prevent deducting boosters
+	end
 
-		if success then
-			-- If Boosters module has tracking for active boosters, use it
-			if Boosters.ActivateBooster then
-				-- Call internal Boosters system to handle activation properly
-				Boosters.ActivateBooster(player, boosterName, quantity, result)
-			else
-				-- Simple tracking approach if the module doesn't have built-in tracking
-				local activationTime = os.time()
-				local duration = boosterItem.duration or 60 -- Default 60 seconds if not specified
+	-- Only proceed if we can activate the booster
+	if canActivate then
+		-- Deduct boosters from player's count AFTER we've verified we can activate
+		boosterStat.Value = boosterStat.Value - quantity
 
-				-- Multiply duration by quantity to get total duration
-				local totalDuration = duration * quantity
-				local expirationTime = activationTime + totalDuration
+		-- Run the booster's onActivate function
+		if type(boosterItem.onActivate) == "function" then
+			local success, result = pcall(function()
+				return boosterItem.onActivate(player, quantity)
+			end)
 
-				-- Fire the client event for activation
-				local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated")
-				if activatedEvent then
-					activatedEvent:FireClient(player, boosterName, expirationTime)
-				end
+			if success then
+				-- If Boosters module has tracking for active boosters, use it
+				if Boosters.ActivateBooster then
+					-- Call internal Boosters system to handle activation properly
+					local activationSuccess = Boosters.ActivateBooster(player, boosterName, quantity, result)
 
-				-- Set up expiration timer if the booster has a duration
-				if totalDuration and totalDuration > 0 then
-					task.delay(totalDuration, function()
-						-- Run cleanup function if available
-						if type(result) == "function" then
-							local success, errorMsg = pcall(result)
-							if not success then
-								warn("Error in cleanup function for booster", boosterName, ":", errorMsg)
+					-- If activation failed, refund the boosters
+					if not activationSuccess then
+						warn("Failed to activate " .. boosterName .. " through Boosters.ActivateBooster")
+						boosterStat.Value = boosterStat.Value + quantity
+					end
+				else
+					-- Simple tracking approach if the module doesn't have built-in tracking
+					local activationTime = os.time()
+					local duration = boosterItem.duration or 60 -- Default 60 seconds if not specified
+
+					-- Multiply duration by quantity to get total duration
+					local totalDuration = duration * quantity
+					local expirationTime = activationTime + totalDuration
+
+					-- Fire the client event for activation
+					local activatedEvent = boosterEvents:FindFirstChild("BoosterActivated")
+					if activatedEvent then
+						activatedEvent:FireClient(player, boosterName, expirationTime)
+					end
+
+					-- Set up expiration timer if the booster has a duration
+					if totalDuration and totalDuration > 0 then
+						task.delay(totalDuration, function()
+							-- Run cleanup function if available
+							if type(result) == "function" then
+								local success, errorMsg = pcall(result)
+								if not success then
+									warn("Error in cleanup function for booster", boosterName, ":", errorMsg)
+								end
 							end
-						end
 
-						-- Fire the client event for deactivation
-						local deactivatedEvent = boosterEvents:FindFirstChild("BoosterDeactivated")
-						if deactivatedEvent then
-							deactivatedEvent:FireClient(player, boosterName)
-						end
-					end)
+							-- Fire the client event for deactivation
+							local deactivatedEvent = boosterEvents:FindFirstChild("BoosterDeactivated")
+							if deactivatedEvent then
+								deactivatedEvent:FireClient(player, boosterName)
+							end
+						end)
+					end
 				end
+			else
+				-- If activation failed, refund the booster
+				warn("Failed to activate booster " .. boosterName .. ": " .. tostring(result))
+				boosterStat.Value = boosterStat.Value + quantity
 			end
 		else
-			-- If activation failed, refund the booster
-			warn("Failed to activate booster " .. boosterName .. ": " .. tostring(result))
+			-- If there's no activation function, refund the booster
+			warn("Booster " .. boosterName .. " doesn't have an onActivate function")
 			boosterStat.Value = boosterStat.Value + quantity
 		end
-	else
-		-- If there's no activation function, refund the booster
-		warn("Booster " .. boosterName .. " doesn't have an onActivate function")
-		boosterStat.Value = boosterStat.Value + quantity
 	end
 end)
 

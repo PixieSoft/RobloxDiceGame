@@ -31,7 +31,71 @@ Boosters.BoosterTypes = {
 
 -- Booster definitions with all properties
 Boosters.Items = {
+	Bugs = {
+		-- Make this 1% for 1m per bug with a minimum of +1 speed
+		name = "Bug",
+		description = "+1 walkspeed for 1 minute per bug used",
+		imageId = "rbxassetid://109760311419104",
+		boosterType = Boosters.BoosterTypes.PLAYER,
+		duration = 60, -- 60 seconds (1 minute) per bug
+		stacks = true, -- Allows stacking multiple bugs at once for stronger effect
+		canCancel = true,
+
+		-- Function that runs when booster is activated
+		onActivate = function(player, qty)
+			-- This function only runs on the server
+			if not IsServer then return function() end end
+
+			-- Get the player's character and humanoid
+			local character = player.Character
+			if not character then return function() end end
+
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if not humanoid then return function() end end
+
+			-- Store original walk speed
+			local originalWalkSpeed = humanoid.WalkSpeed
+
+			-- Increase walk speed by 1 for each bug used
+			humanoid.WalkSpeed = originalWalkSpeed + qty
+
+			-- Print feedback
+			print("Activated Bug booster for " .. player.Name .. ": +" .. qty .. " walkspeed for " .. (qty * 60) .. " seconds")
+
+			-- Setup character added event in case player dies during effect
+			local characterAddedConnection
+			characterAddedConnection = player.CharacterAdded:Connect(function(newCharacter)
+				-- Wait for the humanoid to be added
+				local newHumanoid = newCharacter:WaitForChild("Humanoid")
+
+				-- Apply the speed boost to the new character
+				if newHumanoid then
+					newHumanoid.WalkSpeed = originalWalkSpeed + qty
+				end
+			end)
+
+			-- Return cleanup function
+			return function()
+				-- Disconnect the CharacterAdded event
+				if characterAddedConnection then
+					characterAddedConnection:Disconnect()
+				end
+
+				-- Restore original walk speed if the character still exists
+				local currentCharacter = player.Character
+				if currentCharacter then
+					local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
+					if currentHumanoid then
+						currentHumanoid.WalkSpeed = originalWalkSpeed
+						print("Bug booster expired for " .. player.Name .. ": walkspeed restored to " .. originalWalkSpeed)
+					end
+				end
+			end
+		end
+	},
+
 	Crystals = {
+		-- Shrink for 10s per crystal used. Stack duration only. Can cancel.
 		name = "Crystal",
 		description = "Shrink for 10s per crystal used.",
 		imageId = "rbxassetid://72049224483385",
@@ -50,45 +114,11 @@ Boosters.Items = {
 		end
 	},
 
-	Mushrooms = {
-		name = "Mushroom",
-		description = "+1% jump height for 1 minute per mushroom",
-		imageId = "rbxassetid://134097767361051",
-		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 60, -- 1 minute = 60 seconds
-		stacks = true, -- Allow multiple mushrooms to stack
-		canCancel = true,
-
-		-- Function that runs when booster is activated
-		onActivate = function(player, qty)
-			-- This function only runs on the server
-			if not IsServer then return function() end end
-
-			-- Return a proper cleanup function
-			return function() end
-		end
-	},
-
-	LavaBalls = {
-		name = "Lava Ball",
-		description = "Drops a block under your feet for 5s. Using 10 doubles the size. Using 100 triples the size.",
-		imageId = "rbxassetid://73449632309262",
-		boosterType = Boosters.BoosterTypes.PLAYER,
-		duration = 5, -- 5 seconds
-		stacks = false,
-		canCancel = true,
-
-		-- Function that runs when booster is activated
-		onActivate = function(player, qty)
-			-- This function only runs on the server
-			if not IsServer then return function() end end
-
-			-- Return a proper cleanup function
-			return function() end
-		end
-	},
-
 	Fuel = {
+		-- 1 fuel used per teleport
+		-- 1 fuel to fill gauge for jetpack to fly, minecarts to go faster?
+		-- make flowers grow?
+		-- 100 poops to summon boss in greenhouse or somewhere?
 		name = "Fuel",
 		description = "Fills your fuel gauge for transportation.",
 		imageId = "rbxassetid://7123456792", -- Replace with actual image ID
@@ -107,12 +137,18 @@ Boosters.Items = {
 		end
 	},
 
-	Bugs = {
-		name = "Bug",
-		description = "Applies a glitch effect to your dice for 30 minutes",
-		imageId = "rbxassetid://109760311419104",
-		boosterType = Boosters.BoosterTypes.DICE,
-		duration = 10, -- Set to 10 seconds for testing (normally would be 1800 for 30 minutes)
+	LavaBalls = {
+		-- drop a lava block. 1x1 default. 2x2 if spend 10. 3x3 for 100. 4x4 for 1000.
+		-- 5s per ball
+		-- generally used for jump boosting
+		-- use while jumping. summons in the air. can use this to hold yourself and jump again.
+		-- comes into existence colliding only with player. anchors immediately. then becomes
+		-- collidable with everything. keep it flat and aligned with the world. 
+		name = "Lava Ball",
+		description = "Drops a block under your feet for 5s. Using 10 doubles the size. Using 100 triples the size.",
+		imageId = "rbxassetid://73449632309262",
+		boosterType = Boosters.BoosterTypes.PLAYER,
+		duration = 5, -- 5 seconds
 		stacks = false,
 		canCancel = true,
 
@@ -126,7 +162,37 @@ Boosters.Items = {
 		end
 	},
 
+	Mushrooms = { -- NEXT
+		-- Jump Height bonus. 7.2 base. 40 is comfy, 100 too much indoor. 100-200 outdoor gets on trees.
+		-- can buy up base.
+		-- +1m per item used.
+		-- +0.5 per item used? gives noticable bonus.
+		-- maybe 1.0 per item? spending 100 should get to treetops in swamp
+		-- need to be able to get into trees to get Nyx. gathering 100 shrooms pretty quick.
+		name = "Mushroom",
+		description = "+1% jump height for 1 minute per mushroom",
+		imageId = "rbxassetid://134097767361051",
+		boosterType = Boosters.BoosterTypes.PLAYER,
+		duration = 60, -- 1 minute = 60 seconds
+		stacks = true, -- Allow multiple mushrooms to stack
+		canCancel = true,
+
+		-- Function that runs when booster is activated
+		onActivate = function(player, qty)
+			-- This function only runs on the server
+			if not IsServer then return function() end end
+
+			-- Return a proper cleanup function
+			return function() end
+		end
+	},
+
 	Pearls = {
+		-- +1m underwater breathing (get 5m free) and a speed boost
+		-- also can buy longer base water breathing time
+		-- in center of game, there's a cup. it gets a pearl in it for every pearl people find.
+		-- anyone can fight the boss. if you win, you get all the pearls. split if multiplayer.
+		-- exclusive boss fights? optional for starter?
 		name = "Pearls",
 		description = "Applies a glitch effect to your dice for 30 minutes",
 		imageId = "rbxassetid://109760311419104z",
@@ -144,8 +210,6 @@ Boosters.Items = {
 			return function() end
 		end
 	},
-
-	-- Add more boosters here with the same structure
 }
 
 -- Only run server-side functionality if we're on the server
@@ -210,9 +274,10 @@ if IsServer then
 			Boosters.ActiveBoosters[player.UserId] = {}
 		end
 
-		-- Check if this booster is already active and doesn't stack
-		if not booster.stacks and Boosters.ActiveBoosters[player.UserId][boosterName] then
-			warn("Cannot stack this booster:", boosterName)
+		-- Check if this booster is already active
+		-- For all boosters (even those with stacks=true), prevent re-activation while active
+		if Boosters.ActiveBoosters[player.UserId][boosterName] then
+			warn("Cannot activate booster while already active:", boosterName)
 			return false
 		end
 
