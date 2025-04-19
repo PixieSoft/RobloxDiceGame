@@ -108,15 +108,27 @@ function PlayerSize.SetPlayerSize(player, size)
 		return true
 	else
 		-- Grow back to normal
+		if not shrunkData then
+			warn("Cannot restore size: No shrunk data found for player", player.Name)
+			return false
+		end
+
 		local originalSpeed = shrunkData:GetAttribute("OriginalSpeed") or 16
 		shrunkData:Destroy()
 
 		local scales = {
-			humanoid:WaitForChild("HeadScale"),
-			humanoid:WaitForChild("BodyHeightScale"),
-			humanoid:WaitForChild("BodyWidthScale"),
-			humanoid:WaitForChild("BodyDepthScale")
+			humanoid:FindFirstChild("HeadScale"),
+			humanoid:FindFirstChild("BodyHeightScale"),
+			humanoid:FindFirstChild("BodyWidthScale"),
+			humanoid:FindFirstChild("BodyDepthScale")
 		}
+
+		-- Ensure all scales exist before setting values
+		for i, scaleName in ipairs({"HeadScale", "BodyHeightScale", "BodyWidthScale", "BodyDepthScale"}) do
+			if not scales[i] then
+				scales[i] = ensureScaleExists(humanoid, scaleName)
+			end
+		end
 
 		for _, scale in ipairs(scales) do
 			scale.Value = 1
@@ -135,7 +147,7 @@ function PlayerSize.SetPlayerSize(player, size)
 	end
 end
 
--- For backward compatibility
+-- For backward compatibility - still allows using the toggle parameter
 function PlayerSize.TogglePlayerSize(player)
 	return PlayerSize.SetPlayerSize(player, "toggle")
 end
@@ -161,8 +173,14 @@ local function initializeRemoteEvent()
 	end
 
 	-- Listen for toggle requests
-	remoteEvent.OnServerEvent:Connect(function(player)
-		PlayerSize.TogglePlayerSize(player)
+	remoteEvent.OnServerEvent:Connect(function(player, action)
+		if action == "toggle" or action == nil then
+			PlayerSize.SetPlayerSize(player, "toggle")
+		elseif action == "small" then
+			PlayerSize.SetPlayerSize(player, "small")
+		elseif action == "normal" then
+			PlayerSize.SetPlayerSize(player, "normal")
+		end
 	end)
 
 	return remoteEvent

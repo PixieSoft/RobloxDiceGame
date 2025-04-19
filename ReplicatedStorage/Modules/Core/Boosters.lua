@@ -32,7 +32,7 @@ Boosters.BoosterTypes = {
 Boosters.Items = {}
 
 -- Path to booster modules
-local BOOSTERS_PATH = ReplicatedStorage:FindFirstChild("Modules"):FindFirstChild("Core"):FindFirstChild("Boosters")
+local BOOSTERS_PATH = ReplicatedStorage.Modules.Core:FindFirstChild("BoosterDefs")
 
 -- Function to load an individual booster
 local function loadBooster(name, module)
@@ -63,32 +63,60 @@ end
 local function loadBoosterModules()
 	-- Check if the Boosters folder exists
 	if not BOOSTERS_PATH then
-		warn("Boosters folder not found at path: ReplicatedStorage.Modules.Core.Boosters")
+		error("Boosters folder not found at path: ReplicatedStorage.Modules.Core.Boosters")
 		return
 	end
 
-	print("Loading booster modules from:", BOOSTERS_PATH:GetFullName())
+	-- Debug: Print the full path to the Boosters folder
+	print("DEBUG - Loading booster modules from:", BOOSTERS_PATH:GetFullName())
 
-	-- Print all children of the Boosters folder to debug
-	for _, child in pairs(BOOSTERS_PATH:GetChildren()) do
-		print("Found module in Boosters folder:", child.Name)
-	end
-
-	-- Try to load the Crystals module specifically
-	if BOOSTERS_PATH:FindFirstChild("Crystals") then
-		print("Found Crystals module, attempting to load...")
-		local success = loadBooster("Crystals", BOOSTERS_PATH.Crystals)
-		if success then
-			print("Crystals booster loaded successfully!")
-		else
-			warn("Failed to load Crystals booster")
+	-- Debug: Check if the folder exists and what's in it
+	if BOOSTERS_PATH then
+		print("DEBUG - Boosters folder exists with " .. #BOOSTERS_PATH:GetChildren() .. " children")
+		for i, child in ipairs(BOOSTERS_PATH:GetChildren()) do
+			print("DEBUG - Child #" .. i .. ": " .. child.Name .. " (" .. child.ClassName .. ")")
 		end
 	else
-		warn("Crystals module not found in " .. BOOSTERS_PATH:GetFullName())
+		print("DEBUG - Boosters folder not found!")
 	end
 
-	-- Add more booster module loading here as you create them
-	-- Example: if BOOSTERS_PATH:FindFirstChild("Mushrooms") then loadBooster("Mushrooms", BOOSTERS_PATH.Mushrooms) end
+	-- Debug: Check specifically for Crystals module
+	local crystalsModule = BOOSTERS_PATH and BOOSTERS_PATH:FindFirstChild("Crystals")
+	if crystalsModule then
+		print("DEBUG - Crystals module found! Attempting to load...")
+	else
+		print("DEBUG - Crystals module NOT found in Boosters folder!")
+	end
+
+	-- Iterate through all modules in the Boosters folder
+	for _, module in pairs(BOOSTERS_PATH:GetChildren()) do
+		if module:IsA("ModuleScript") then
+			local boosterName = module.Name
+			print("Loading booster module:", boosterName)
+
+			-- Debug: More verbose loading process
+			print("DEBUG - Attempting to load " .. boosterName .. "...")
+			local success = loadBooster(boosterName, module)
+			if success then
+				print("DEBUG - Successfully loaded " .. boosterName .. "!")
+			else
+				print("DEBUG - Failed to load " .. boosterName .. "!")
+			end
+		end
+	end
+
+	-- Debug: Print all loaded boosters
+	print("DEBUG - Loaded boosters in Boosters.Items:")
+	for name, _ in pairs(Boosters.Items) do
+		print("DEBUG - - " .. name)
+	end
+
+	-- Print summary of loaded boosters
+	local boosterCount = 0
+	for name, _ in pairs(Boosters.Items) do
+		boosterCount = boosterCount + 1
+	end
+	print("Total boosters loaded:", boosterCount)
 end
 
 -- Define boosters that haven't been moved to their own modules yet
@@ -248,7 +276,7 @@ local function defineBuiltInBoosters()
 		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
-			
+
 			-- Fire server event 
 			local UsePearlEvent = ReplicatedStorage.Events.Core:WaitForChild("UsePearlEvent")
 			UsePearlEvent:FireServer(player, qty)
@@ -257,44 +285,6 @@ local function defineBuiltInBoosters()
 			return function() end
 		end
 	}
-
-	-- Add the Crystal booster directly as a fallback
-	-- This ensures it's available even if module loading fails
-	if not Boosters.Items.Crystals then
-		print("Adding Crystal booster directly as fallback")
-		Boosters.Items.Crystals = {
-			name = "Crystal",
-			description = "Shrink for 10s per crystal used.",
-			imageId = "rbxassetid://72049224483385",
-			boosterType = Boosters.BoosterTypes.PLAYER,
-			duration = 10, -- 10 seconds per item used
-			stacks = false, -- effect does not stack
-			canCancel = true, -- can be canceled by player
-
-			-- Function that runs when booster is activated
-			onActivate = function(player, qty)
-				-- This function only runs on the server
-				if not IsServer then return function() end end
-
-				-- Return a proper cleanup function
-				if IsServer then
-					-- Simple implementation until module loading is fixed
-					local PlayerSize = require(game.ServerScriptService.Modules.Effects.PlayerSize)
-					if PlayerSize then
-						PlayerSize.TogglePlayerSize(player)
-
-						-- Return cleanup function that will run when the booster expires
-						return function()
-							-- Toggle size back to normal
-							PlayerSize.TogglePlayerSize(player)
-						end
-					end
-				end
-
-				return function() end
-			end
-		}
-	end
 end
 
 -- Print the current module loading status

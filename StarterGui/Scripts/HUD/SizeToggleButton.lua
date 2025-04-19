@@ -10,18 +10,18 @@ local Player = Players.LocalPlayer
 local Interface = Player:WaitForChild("PlayerGui"):WaitForChild("Interface")
 local HUD = Interface:WaitForChild("HUD")
 
--- Shared toggle function for both button and keyboard
+-- Toggle function for both button and keyboard
 local function HandleToggle(button, toggleEvent)
 	if not toggleEvent then return end
 
 	-- Visual feedback if button exists
 	if button then
 		button.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-		toggleEvent:FireServer("toggle")  -- Updated to use the parameter format
+		toggleEvent:FireServer("toggle")  -- Explicitly using "toggle" parameter
 		task.wait(0.5)
 		button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	else
-		toggleEvent:FireServer("toggle")  -- Updated to use the parameter format
+		toggleEvent:FireServer("toggle")  -- Explicitly using "toggle" parameter
 	end
 end
 
