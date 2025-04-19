@@ -1,5 +1,5 @@
 -- /StarterGui/Scripts/HUD/SizeToggleButton.lua
--- LocalScript that adds a button to toggle player size using the PlayerSize module
+-- LocalScript that connects to the existing SizeToggle button to allow players to toggle their character size
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,99 +7,68 @@ local UserInputService = game:GetService("UserInputService")
 local Stat = require(ReplicatedStorage.Stat)
 
 local Player = Players.LocalPlayer
-local Interface = Player:WaitForChild("PlayerGui"):WaitForChild("Interface")
-local HUD = Interface:WaitForChild("HUD")
+local Interface = Player:WaitForChild("PlayerGui"):WaitForChild("HUD")
+local RightHUD = Interface:WaitForChild("RightHUD")
+local SizeToggleButton = RightHUD:WaitForChild("SizeToggle")
 
--- Toggle function for both button and keyboard
+-- Shared toggle function for both button and keyboard
 local function HandleToggle(button, toggleEvent)
 	if not toggleEvent then return end
 
 	-- Visual feedback if button exists
 	if button then
 		button.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-		toggleEvent:FireServer("toggle")  -- Explicitly using "toggle" parameter
+		toggleEvent:FireServer("toggle")  -- Use the parameter format
 		task.wait(0.5)
 		button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	else
-		toggleEvent:FireServer("toggle")  -- Explicitly using "toggle" parameter
+		toggleEvent:FireServer("toggle")  -- Use the parameter format
 	end
 end
 
-local function CreateToggleButton()
-	-- Wait for player data to load
-	if not Stat.WaitForLoad(Player) then return end
+-- Wait for player data to load
+if not Stat.WaitForLoad(Player) then return end
 
-	-- Check if button frame already exists in the HUD
-	local existingFrame = HUD:FindFirstChild("SizeToggleFrame")
-	if existingFrame then return end
-
-	-- Create main container frame
-	local frame = Instance.new("Frame")
-	frame.Name = "SizeToggleFrame"
-	frame.Size = UDim2.new(0, 150, 0, 50)
-	frame.Position = UDim2.new(0.85, 0, 0.85, 0)
-	frame.BackgroundTransparency = 1
-	frame.Parent = HUD
-
-	-- Create button
-	local button = Instance.new("TextButton")
-	button.Name = "Main"
-	button.Size = UDim2.new(1, 0, 1, 0)
-	button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	button.Text = "Toggle Size (C)"
-	button.TextColor3 = Color3.fromRGB(0, 255, 255)
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 22
-	button.Parent = frame
-
-	-- Add visual effects
-	local UICorner = Instance.new("UICorner")
-	UICorner.CornerRadius = UDim.new(0.2, 0)
-	UICorner.Parent = button
-
-	local UIStroke = Instance.new("UIStroke")
-	UIStroke.Name = "UIStroke"
-	UIStroke.Color = Color3.fromRGB(0, 0, 0)
-	UIStroke.Thickness = 1
-	UIStroke.Parent = button
-
-	-- Set up button behavior with additional safety
-	local debounce = false
-	local toggleEvent = ReplicatedStorage:WaitForChild("TogglePlayerSize", 5)
+-- Get or create the remote event
+local toggleEvent = ReplicatedStorage:FindFirstChild("TogglePlayerSize")
+if not toggleEvent then
+	-- If the event doesn't exist, we'll wait for it (it should be created by the PlayerSize module)
+	toggleEvent = ReplicatedStorage:WaitForChild("TogglePlayerSize", 5)
 
 	if not toggleEvent then
 		warn("TogglePlayerSize RemoteEvent not found after 5 seconds")
 		return
 	end
-
-	-- Button click handler
-	button.MouseButton1Click:Connect(function()
-		if debounce then return end
-		debounce = true
-		HandleToggle(button, toggleEvent)
-		debounce = false
-	end)
-
-	-- Keyboard input handler
-	local keyDebounce = false
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.C then
-			if keyDebounce then return end
-			keyDebounce = true
-			HandleToggle(button, toggleEvent)
-			keyDebounce = false
-		end
-	end)
-
-	-- Hover effects
-	button.MouseEnter:Connect(function()
-		button.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
-	end)
-
-	button.MouseLeave:Connect(function()
-		button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	end)
 end
 
-CreateToggleButton()
+-- Set up button behavior with debounce
+local debounce = false
+SizeToggleButton.MouseButton1Click:Connect(function()
+	if debounce then return end
+	debounce = true
+	HandleToggle(SizeToggleButton, toggleEvent)
+	debounce = false
+end)
+
+-- Keyboard input handler for the 'C' key shortcut
+local keyDebounce = false
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.C then
+		if keyDebounce then return end
+		keyDebounce = true
+		HandleToggle(SizeToggleButton, toggleEvent)
+		keyDebounce = false
+	end
+end)
+
+-- Hover effects
+SizeToggleButton.MouseEnter:Connect(function()
+	SizeToggleButton.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+end)
+
+SizeToggleButton.MouseLeave:Connect(function()
+	SizeToggleButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+end)
+
+print("Size toggle system initialized with existing button")
