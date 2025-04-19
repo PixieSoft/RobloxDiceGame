@@ -248,6 +248,10 @@ local function defineBuiltInBoosters()
 		onActivate = function(player, qty)
 			-- This function only runs on the server
 			if not IsServer then return function() end end
+			
+			-- Fire server event 
+			local UsePearlEvent = ReplicatedStorage.Events.Core:WaitForChild("UsePearlEvent")
+			UsePearlEvent:FireServer(player, qty)
 
 			-- Return a proper cleanup function
 			return function() end
