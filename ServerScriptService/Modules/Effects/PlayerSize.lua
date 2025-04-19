@@ -1,105 +1,178 @@
--- /StarterGui/Scripts/HUD/SizeToggleButton.lua
--- LocalScript that adds a button to toggle player size using the PlayerSize module
+-- /ServerScriptService/Modules/Effects/PlayerSize.lua
+-- ModuleScript that provides functions to control player character size
 
+local PlayerSize = {}
+
+local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
-local Stat = require(ReplicatedStorage.Stat)
 
-local Player = Players.LocalPlayer
-local Interface = Player:WaitForChild("PlayerGui"):WaitForChild("Interface")
-local HUD = Interface:WaitForChild("HUD")
+-- Constants 
+local SHRINK_SCALE = 0.25
+local SHRINK_SPEED = 0.50
+local SHRINK_JUMP = 0.33
 
--- Shared toggle function for both button and keyboard
-local function HandleToggle(button, toggleEvent)
-	if not toggleEvent then return end
+-- Create shrunk players storage if it doesn't exist
+local function ensureShrunkPlayersStorage()
+	if not ServerStorage:FindFirstChild("ShrunkPlayers") then
+		local shrunkPlayers = Instance.new("Folder")
+		shrunkPlayers.Name = "ShrunkPlayers"
+		shrunkPlayers.Parent = ServerStorage
+	end
+	return ServerStorage:WaitForChild("ShrunkPlayers")
+end
 
-	-- Visual feedback if button exists
-	if button then
-		button.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-		toggleEvent:FireServer("toggle")  -- Updated to use the parameter format
-		task.wait(0.5)
-		button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+-- Helper function to ensure scale values exist on humanoid
+local function ensureScaleExists(humanoid, scaleName)
+	local scale = humanoid:FindFirstChild(scaleName)
+	if not scale then
+		scale = Instance.new(scaleName)
+		scale.Name = scaleName
+		scale.Value = 1
+		scale.Parent = humanoid
+	end
+	return scale
+end
+
+-- Main function to set player size
+-- size can be "small", "normal", or "toggle"
+function PlayerSize.SetPlayerSize(player, size)
+	if type(size) ~= "string" then
+		warn("Invalid size parameter for SetPlayerSize. Must be 'small', 'normal', or 'toggle'")
+		return false
+	end
+	size = string.lower(size)
+
+	local character = player.Character
+	if not character then 
+		warn("Cannot set size: No character found for player", player.Name)
+		return false
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then 
+		warn("Cannot set size: No humanoid found for player", player.Name)
+		return false
+	end
+
+	local shrunkPlayers = ensureShrunkPlayersStorage()
+	local shrunkData = shrunkPlayers:FindFirstChild(tostring(player.UserId))
+	local isCurrentlySmall = (shrunkData ~= nil)
+
+	-- Determine action based on requested size
+	local shouldShrink = false
+
+	if size == "toggle" then
+		shouldShrink = not isCurrentlySmall
+	elseif size == "small" then
+		shouldShrink = true
+	elseif size == "normal" then
+		shouldShrink = false
 	else
-		toggleEvent:FireServer("toggle")  -- Updated to use the parameter format
-	end
-end
-
-local function CreateToggleButton()
-	-- Wait for player data to load
-	if not Stat.WaitForLoad(Player) then return end
-
-	-- Check if button frame already exists in the HUD
-	local existingFrame = HUD:FindFirstChild("SizeToggleFrame")
-	if existingFrame then return end
-
-	-- Create main container frame
-	local frame = Instance.new("Frame")
-	frame.Name = "SizeToggleFrame"
-	frame.Size = UDim2.new(0, 150, 0, 50)
-	frame.Position = UDim2.new(0.85, 0, 0.85, 0)
-	frame.BackgroundTransparency = 1
-	frame.Parent = HUD
-
-	-- Create button
-	local button = Instance.new("TextButton")
-	button.Name = "Main"
-	button.Size = UDim2.new(1, 0, 1, 0)
-	button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	button.Text = "Toggle Size (C)"
-	button.TextColor3 = Color3.fromRGB(0, 255, 255)
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 22
-	button.Parent = frame
-
-	-- Add visual effects
-	local UICorner = Instance.new("UICorner")
-	UICorner.CornerRadius = UDim.new(0.2, 0)
-	UICorner.Parent = button
-
-	local UIStroke = Instance.new("UIStroke")
-	UIStroke.Name = "UIStroke"
-	UIStroke.Color = Color3.fromRGB(0, 0, 0)
-	UIStroke.Thickness = 1
-	UIStroke.Parent = button
-
-	-- Set up button behavior with additional safety
-	local debounce = false
-	local toggleEvent = ReplicatedStorage:WaitForChild("TogglePlayerSize", 5)
-
-	if not toggleEvent then
-		warn("TogglePlayerSize RemoteEvent not found after 5 seconds")
-		return
+		warn("Invalid size parameter: '" .. size .. "'. Must be 'small', 'normal', or 'toggle'")
+		return false
 	end
 
-	-- Button click handler
-	button.MouseButton1Click:Connect(function()
-		if debounce then return end
-		debounce = true
-		HandleToggle(button, toggleEvent)
-		debounce = false
-	end)
+	-- Already in desired state? Return early
+	if shouldShrink == isCurrentlySmall then
+		return true -- Already in the desired state
+	end
 
-	-- Keyboard input handler
-	local keyDebounce = false
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.C then
-			if keyDebounce then return end
-			keyDebounce = true
-			HandleToggle(button, toggleEvent)
-			keyDebounce = false
+	if shouldShrink then
+		-- Shrink the player
+		local marker = Instance.new("BoolValue")
+		marker.Name = tostring(player.UserId)
+		-- Store original speed as an attribute
+		marker:SetAttribute("OriginalSpeed", humanoid.WalkSpeed)
+		marker.Parent = shrunkPlayers
+
+		local scales = {
+			ensureScaleExists(humanoid, "HeadScale"),
+			ensureScaleExists(humanoid, "BodyHeightScale"),
+			ensureScaleExists(humanoid, "BodyWidthScale"),
+			ensureScaleExists(humanoid, "BodyDepthScale")
+		}
+
+		for _, scale in ipairs(scales) do
+			scale.Value = scale.Value * SHRINK_SCALE
 		end
-	end)
 
-	-- Hover effects
-	button.MouseEnter:Connect(function()
-		button.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
-	end)
+		humanoid.WalkSpeed = humanoid.WalkSpeed * SHRINK_SPEED
+		humanoid.JumpPower = humanoid.JumpPower * SHRINK_JUMP
 
-	button.MouseLeave:Connect(function()
-		button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	end)
+		for _, part in pairs(character:GetChildren()) do
+			if part:IsA("BasePart") then
+				part.CustomPhysicalProperties = PhysicalProperties.new(13, 0.3, 0.5)
+			end
+		end
+
+		return true
+	else
+		-- Grow back to normal
+		local originalSpeed = shrunkData:GetAttribute("OriginalSpeed") or 16
+		shrunkData:Destroy()
+
+		local scales = {
+			humanoid:WaitForChild("HeadScale"),
+			humanoid:WaitForChild("BodyHeightScale"),
+			humanoid:WaitForChild("BodyWidthScale"),
+			humanoid:WaitForChild("BodyDepthScale")
+		}
+
+		for _, scale in ipairs(scales) do
+			scale.Value = 1
+		end
+
+		humanoid.WalkSpeed = originalSpeed
+		humanoid.JumpPower = 50
+
+		for _, part in pairs(character:GetChildren()) do
+			if part:IsA("BasePart") then
+				part.CustomPhysicalProperties = nil
+			end
+		end
+
+		return true
+	end
 end
 
-CreateToggleButton()
+-- For backward compatibility
+function PlayerSize.TogglePlayerSize(player)
+	return PlayerSize.SetPlayerSize(player, "toggle")
+end
+
+-- Check if a player is currently small
+function PlayerSize.IsPlayerSmall(player)
+	local shrunkPlayers = ServerStorage:FindFirstChild("ShrunkPlayers")
+	if not shrunkPlayers then return false end
+
+	return shrunkPlayers:FindFirstChild(tostring(player.UserId)) ~= nil
+end
+
+-- Initialize remote event for client-server communication
+local function initializeRemoteEvent()
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+	-- Create RemoteEvent if it doesn't exist
+	local remoteEvent = ReplicatedStorage:FindFirstChild("TogglePlayerSize")
+	if not remoteEvent then
+		remoteEvent = Instance.new("RemoteEvent")
+		remoteEvent.Name = "TogglePlayerSize"
+		remoteEvent.Parent = ReplicatedStorage
+	end
+
+	-- Listen for toggle requests
+	remoteEvent.OnServerEvent:Connect(function(player)
+		PlayerSize.TogglePlayerSize(player)
+	end)
+
+	return remoteEvent
+end
+
+-- Initialize storage and RemoteEvent
+do
+	ensureShrunkPlayersStorage()
+	initializeRemoteEvent()
+	print("PlayerSize module initialized")
+end
+
+return PlayerSize
