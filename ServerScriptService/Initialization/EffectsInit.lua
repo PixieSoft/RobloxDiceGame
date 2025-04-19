@@ -2,4 +2,4 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 
 -- Initialize all effect modules
-local PlayerSizeToggle = require(ServerScriptService.Modules.Effects.PlayerSizeToggle)
+local PlayerSize = require(ServerScriptService.Modules.Effects.PlayerSize)

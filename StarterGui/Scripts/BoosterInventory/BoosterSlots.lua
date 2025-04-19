@@ -246,7 +246,7 @@ failureEvent.OnClientEvent:Connect(function(boosterName, reason)
 	-- Show notification to the player about why it failed
 	local message = "Cannot use " .. boosterName .. ": " .. reason
 	showNotification(message, Color3.fromRGB(255, 100, 100), 3)
-	})
+	end)
 
 	-- Make sure player data is loaded before initializing
 if not waitForPlayerData() then

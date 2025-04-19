@@ -7,7 +7,6 @@ local Boosters = {}
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
 local RunService = game:GetService("RunService")
 
 -- Check if this is running on the server or client
@@ -29,9 +28,73 @@ Boosters.BoosterTypes = {
 	GLOBAL = "GlobalBoost"  -- Affects game-wide mechanics
 }
 
--- Booster definitions with all properties
-Boosters.Items = {
-	Bugs = {
+-- Initialize the boosters table
+Boosters.Items = {}
+
+-- Path to booster modules
+local BOOSTERS_PATH = ReplicatedStorage:FindFirstChild("Modules"):FindFirstChild("Core"):FindFirstChild("Boosters")
+
+-- Function to load an individual booster
+local function loadBooster(name, module)
+	local success, boosterData = pcall(require, module)
+
+	if success then
+		-- Map boosterType string to actual enum if needed
+		if boosterData.boosterType and type(boosterData.boosterType) == "string" then
+			for typeName, typeValue in pairs(Boosters.BoosterTypes) do
+				if boosterData.boosterType == typeValue then
+					boosterData.boosterType = Boosters.BoosterTypes[typeName]
+					break
+				end
+			end
+		end
+
+		-- Add to the Items dictionary
+		Boosters.Items[name] = boosterData
+		print("Successfully loaded booster module: " .. name)
+		return true
+	else
+		warn("Failed to load booster module " .. name .. ": " .. tostring(boosterData))
+		return false
+	end
+end
+
+-- Load individual booster modules from the Boosters folder
+local function loadBoosterModules()
+	-- Check if the Boosters folder exists
+	if not BOOSTERS_PATH then
+		warn("Boosters folder not found at path: ReplicatedStorage.Modules.Core.Boosters")
+		return
+	end
+
+	print("Loading booster modules from:", BOOSTERS_PATH:GetFullName())
+
+	-- Print all children of the Boosters folder to debug
+	for _, child in pairs(BOOSTERS_PATH:GetChildren()) do
+		print("Found module in Boosters folder:", child.Name)
+	end
+
+	-- Try to load the Crystals module specifically
+	if BOOSTERS_PATH:FindFirstChild("Crystals") then
+		print("Found Crystals module, attempting to load...")
+		local success = loadBooster("Crystals", BOOSTERS_PATH.Crystals)
+		if success then
+			print("Crystals booster loaded successfully!")
+		else
+			warn("Failed to load Crystals booster")
+		end
+	else
+		warn("Crystals module not found in " .. BOOSTERS_PATH:GetFullName())
+	end
+
+	-- Add more booster module loading here as you create them
+	-- Example: if BOOSTERS_PATH:FindFirstChild("Mushrooms") then loadBooster("Mushrooms", BOOSTERS_PATH.Mushrooms) end
+end
+
+-- Define boosters that haven't been moved to their own modules yet
+-- These will be combined with the dynamically loaded boosters
+local function defineBuiltInBoosters()
+	Boosters.Items.Bugs = {
 		-- Make this 1% for 1m per bug with a minimum of +1 speed
 		name = "Bug",
 		description = "+1 walkspeed for 1 minute per bug used",
@@ -92,29 +155,9 @@ Boosters.Items = {
 				end
 			end
 		end
-	},
+	}
 
-	Crystals = {
-		-- Shrink for 10s per crystal used. Stack duration only. Can cancel.
-		name = "Crystal",
-		description = "Shrink for 10s per crystal used.",
-		imageId = "rbxassetid://72049224483385",
-		type = Boosters.BoosterTypes.PLAYER,
-		duration = 10, -- 10 seconds per item used
-		stacks = false, -- effect does not stack
-		canCancel = true, -- can be canceled by player
-
-		-- Function that runs when booster is activated
-		onActivate = function(player, qty)
-			-- This function only runs on the server
-			if not IsServer then return function() end end
-
-			-- Return a proper cleanup function
-			return function() end
-		end
-	},
-
-	Fuel = {
+	Boosters.Items.Fuel = {
 		-- 1 fuel used per teleport
 		-- 1 fuel to fill gauge for jetpack to fly, minecarts to go faster?
 		-- make flowers grow?
@@ -135,9 +178,9 @@ Boosters.Items = {
 			-- Return a proper cleanup function
 			return function() end
 		end
-	},
+	}
 
-	LavaBalls = {
+	Boosters.Items.LavaBalls = {
 		-- drop a lava block. 1x1 default. 2x2 if spend 10. 3x3 for 100. 4x4 for 1000.
 		-- 5s per ball
 		-- generally used for jump boosting
@@ -160,9 +203,9 @@ Boosters.Items = {
 			-- Return a proper cleanup function
 			return function() end
 		end
-	},
+	}
 
-	Mushrooms = { -- NEXT
+	Boosters.Items.Mushrooms = {
 		-- Jump Height bonus. 7.2 base. 40 is comfy, 100 too much indoor. 100-200 outdoor gets on trees.
 		-- can buy up base.
 		-- +1m per item used.
@@ -185,9 +228,9 @@ Boosters.Items = {
 			-- Return a proper cleanup function
 			return function() end
 		end
-	},
+	}
 
-	Pearls = {
+	Boosters.Items.Pearls = {
 		-- +1m underwater breathing (get 5m free) and a speed boost
 		-- also can buy longer base water breathing time
 		-- in center of game, there's a cup. it gets a pearl in it for every pearl people find.
@@ -209,8 +252,61 @@ Boosters.Items = {
 			-- Return a proper cleanup function
 			return function() end
 		end
-	},
-}
+	}
+
+	-- Add the Crystal booster directly as a fallback
+	-- This ensures it's available even if module loading fails
+	if not Boosters.Items.Crystals then
+		print("Adding Crystal booster directly as fallback")
+		Boosters.Items.Crystals = {
+			name = "Crystal",
+			description = "Shrink for 10s per crystal used.",
+			imageId = "rbxassetid://72049224483385",
+			boosterType = Boosters.BoosterTypes.PLAYER,
+			duration = 10, -- 10 seconds per item used
+			stacks = false, -- effect does not stack
+			canCancel = true, -- can be canceled by player
+
+			-- Function that runs when booster is activated
+			onActivate = function(player, qty)
+				-- This function only runs on the server
+				if not IsServer then return function() end end
+
+				-- Return a proper cleanup function
+				if IsServer then
+					-- Simple implementation until module loading is fixed
+					local PlayerSize = require(game.ServerScriptService.Modules.Effects.PlayerSize)
+					if PlayerSize then
+						PlayerSize.TogglePlayerSize(player)
+
+						-- Return cleanup function that will run when the booster expires
+						return function()
+							-- Toggle size back to normal
+							PlayerSize.TogglePlayerSize(player)
+						end
+					end
+				end
+
+				return function() end
+			end
+		}
+	end
+end
+
+-- Print the current module loading status
+print("Initializing Boosters module...")
+
+-- Initialize the boosters
+defineBuiltInBoosters()
+loadBoosterModules()
+
+-- Print the number of booster types loaded
+local boosterCount = 0
+for name, _ in pairs(Boosters.Items) do
+	boosterCount = boosterCount + 1
+	print("Loaded booster: " .. name)
+end
+print("Total boosters loaded: " .. boosterCount)
 
 -- Only run server-side functionality if we're on the server
 if IsServer then
@@ -252,6 +348,8 @@ if IsServer then
 				newStat.Name = boosterName
 				newStat.Value = 0 -- Start with 0 boosters
 				newStat.Parent = boostersFolder
+
+				print("Created stat for booster: " .. boosterName)
 			end
 		end
 

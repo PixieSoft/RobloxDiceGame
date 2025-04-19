@@ -53,6 +53,17 @@ local function CreateSimpleBoosterDisplay(player)
 	-- Store references to row containers
 	local boosterRows = {}
 
+	-- Function to get display name for a booster
+	local function getBoosterDisplayName(boosterName)
+		-- Check if there's a custom display name in the Boosters module
+		if Boosters.Items[boosterName] and Boosters.Items[boosterName].name then
+			return Boosters.Items[boosterName].name
+		end
+
+		-- Fall back to the raw name
+		return boosterName
+	end
+
 	-- Function to update booster list
 	local function UpdateBoosterList()
 		-- Check for leaderstats.Boosters
@@ -183,11 +194,13 @@ local function CreateSimpleBoosterDisplay(player)
 				if isActiveIndicator then
 					-- This is an active status indicator
 					local baseName = boosterName:gsub("_Active$", "")
-					label.Text = "⚡ " .. baseName .. ": " .. booster.Value .. "s"
+					local displayName = getBoosterDisplayName(baseName)
+					label.Text = "⚡ " .. displayName .. ": " .. booster.Value .. "s"
 					label.TextColor3 = Color3.fromRGB(100, 255, 100)
 				else
 					-- This is a regular booster count
-					label.Text = "🔹 " .. boosterName .. ": " .. booster.Value
+					local displayName = getBoosterDisplayName(boosterName)
+					label.Text = "🔹 " .. displayName .. ": " .. booster.Value
 					label.TextColor3 = Color3.fromRGB(255, 255, 255)
 				end
 			end
@@ -197,6 +210,39 @@ local function CreateSimpleBoosterDisplay(player)
 			yPos = yPos + 30
 		end
 	end
+
+	-- Add Booster Count section
+	local countSection = Instance.new("Frame")
+	countSection.Name = "BoosterCountSection"
+	countSection.Size = UDim2.new(1, 0, 0, 30)
+	countSection.Position = UDim2.new(0, 0, 0, 3) -- Position it above the refresh button
+	countSection.BackgroundTransparency = 1
+	countSection.Parent = title
+
+	local countLabel = Instance.new("TextLabel")
+	countLabel.Name = "CountLabel"
+	countLabel.Size = UDim2.new(1, 0, 1, 0)
+	countLabel.BackgroundTransparency = 1
+	countLabel.TextSize = 12
+	countLabel.Font = Enum.Font.Gotham
+	countLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	countLabel.Text = "Loading booster data..."
+	countLabel.Parent = countSection
+
+	-- Function to update booster count
+	local function UpdateBoosterCount()
+		-- Count the number of booster types defined in the module
+		local boosterTypeCount = 0
+
+		for _ in pairs(Boosters.Items) do
+			boosterTypeCount = boosterTypeCount + 1
+		end
+
+		countLabel.Text = "Available Boosters: " .. boosterTypeCount
+	end
+
+	-- Call UpdateBoosterCount immediately
+	UpdateBoosterCount()
 
 	-- Set up event connections to detect changes
 	local function SetupMonitoring()
@@ -272,7 +318,7 @@ local function CreateSimpleBoosterDisplay(player)
 	local refreshButton = Instance.new("TextButton")
 	refreshButton.Name = "RefreshButton"
 	refreshButton.Size = UDim2.new(0.4, 0, 0, 25)
-	refreshButton.Position = UDim2.new(0.3, 0, 0, 3)
+	refreshButton.Position = UDim2.new(0.3, 0, 0, 35) -- Moved down to make room for booster count
 	refreshButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 	refreshButton.BackgroundTransparency = 0.5
 	refreshButton.BorderSizePixel = 1
@@ -281,7 +327,63 @@ local function CreateSimpleBoosterDisplay(player)
 	refreshButton.TextSize = 14
 	refreshButton.Font = Enum.Font.Gotham
 	refreshButton.Parent = title
-	refreshButton.MouseButton1Click:Connect(UpdateBoosterList)
+	refreshButton.MouseButton1Click:Connect(function()
+		UpdateBoosterList()
+		UpdateBoosterCount() -- Also refresh the booster count
+	end)
+
+	-- Add buttons to give common boosters
+	local function AddQuickGiveButtons()
+		local buttonsContainer = Instance.new("Frame")
+		buttonsContainer.Name = "QuickGiveButtons"
+		buttonsContainer.Size = UDim2.new(1, 0, 0, 30)
+		buttonsContainer.Position = UDim2.new(0, 0, 1, -30)
+		buttonsContainer.BackgroundTransparency = 0.5
+		buttonsContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		buttonsContainer.BorderSizePixel = 1
+		buttonsContainer.BorderColor3 = Color3.fromRGB(60, 60, 60)
+		buttonsContainer.Parent = frame
+
+		local buttonLayout = Instance.new("UIListLayout")
+		buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+		buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		buttonLayout.Padding = UDim.new(0, 10)
+		buttonLayout.Parent = buttonsContainer
+
+		-- Get a sorted list of boosters to add buttons for
+		local boostersList = {}
+		for boosterName, _ in pairs(Boosters.Items) do
+			table.insert(boostersList, boosterName)
+		end
+		table.sort(boostersList)
+
+		-- Only show buttons for the first 4 boosters to avoid cluttering
+		local maxButtons = math.min(4, #boostersList)
+		for i = 1, maxButtons do
+			local boosterName = boostersList[i]
+			local displayName = getBoosterDisplayName(boosterName)
+
+			local button = Instance.new("TextButton")
+			button.Name = boosterName .. "Button"
+			button.Size = UDim2.new(0, 55, 0, 25)
+			button.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+			button.BackgroundTransparency = 0.5
+			button.BorderSizePixel = 1
+			button.Text = "+1 " .. string.sub(displayName, 1, 4) -- Shortened name
+			button.TextColor3 = Color3.fromRGB(255, 255, 255)
+			button.TextSize = 10
+			button.Font = Enum.Font.GothamBold
+			button.Parent = buttonsContainer
+
+			button.MouseButton1Click:Connect(function()
+				Boosters.GiveBooster(player, boosterName, 1)
+			end)
+		end
+	end
+
+	-- Add the quick give buttons
+	AddQuickGiveButtons()
 
 	-- Do initial update
 	UpdateBoosterList()

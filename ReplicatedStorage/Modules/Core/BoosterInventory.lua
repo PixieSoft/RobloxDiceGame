@@ -366,6 +366,12 @@ function BoosterInventory.Refresh()
 	return BoosterInventory.Populate()
 end
 
+-- ForceRefresh function (added to fix the nil error)
+function BoosterInventory.ForceRefresh()
+	print("ForceRefresh called - performing full refresh")
+	return BoosterInventory.Populate()
+end
+
 -- Cleanup function to disconnect events
 function BoosterInventory.Cleanup()
 	-- Clean up all stored connections
