@@ -2,17 +2,35 @@
 -- ModuleScript that defines the Mushroom booster behavior
 
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local IsServer = RunService:IsServer()
+
+-- Import utility module
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
 -- Booster definition 
 return {
 	name = "Mushroom",
-	description = "+1% jump height for 1 minute per mushroom",
+	description = "+1% jump height for 1 minute per mushroom.",
 	imageId = "rbxassetid://134097767361051",
 	boosterType = "PlayerBoost", -- Will be mapped to Boosters.BoosterTypes.PLAYER
 	duration = 10, -- Was 60s, changed to 10s for testing.
 	stacks = true, -- Allow multiple mushrooms to stack
 	canCancel = true,
+
+	-- Function to calculate and return effect description
+	calculateEffect = function(spendingAmount)
+		if spendingAmount <= 0 then
+			return "Select mushrooms to use"
+		end
+
+		local jumpBoost = spendingAmount * 0.01 -- 1% per mushroom
+		local totalDuration = 10 * spendingAmount -- 10s per mushroom (testing duration)
+		local timeText = Utility.FormatTimeDuration(totalDuration)
+
+		local pluralText = spendingAmount > 1 and "mushrooms" or "mushroom"
+		return "+" .. (jumpBoost * 100) .. "% jump height for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. "."
+	end,
 
 	-- Function that runs when booster is activated
 	onActivate = function(player, qty)

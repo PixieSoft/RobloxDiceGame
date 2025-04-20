@@ -23,6 +23,11 @@ local boostersFrame = nil -- Reference to the BoosterInventory frame
 local boostersContainer = nil -- Reference to the Boosters container inside BoosterInventory
 local template = nil -- Reference to the Template
 
+-- Info panel references
+local infoPanel = nil -- Reference to the UsageInfo frame
+local infoDescLabel = nil -- Reference to the description label
+local infoEffectLabel = nil -- Reference to the effect label
+
 -- Use a metadata table to store button connections instead of attributes
 local buttonConnections = {}
 
@@ -35,6 +40,58 @@ local function cleanupButtonConnection(button)
 end
 
 -- Private functions
+
+-- Update the UsageInfo panel with information about the selected booster
+local function UpdateUsageInfo(boosterName, spendingAmount)
+	-- Check if info panel references exist
+	if not infoPanel or not infoDescLabel or not infoEffectLabel then
+		return
+	end
+
+	-- Get the booster info from the Boosters module
+	local boosterInfo = Boosters.Items[boosterName]
+	if not boosterInfo then
+		infoDescLabel.Text = "No information available"
+		infoEffectLabel.Text = ""
+		return
+	end
+
+	-- Update description label with "BoosterName: Description" format
+	local boosterDisplayName = boosterInfo.name or boosterName
+	infoDescLabel.Text = boosterDisplayName .. ": " .. (boosterInfo.description or "No description available")
+
+	-- Use the booster's calculateEffect function if available, otherwise use fallback
+	local effectText = ""
+	if boosterInfo.calculateEffect then
+		-- Use the booster's custom effect calculator
+		effectText = boosterInfo.calculateEffect(spendingAmount)
+	else
+		-- Fallback for boosters without a calculator
+		if spendingAmount <= 0 then
+			effectText = "Select quantity to use"
+		else
+			local plural = spendingAmount > 1 and "s" or ""
+
+			if boosterInfo.duration then
+				local totalDuration = boosterInfo.duration * spendingAmount
+				local minutes = math.floor(totalDuration / 60)
+				local seconds = totalDuration % 60
+
+				if minutes > 0 then
+					effectText = "Effect: " .. spendingAmount .. " " .. (boosterInfo.name or boosterName) .. plural .. " for " ..
+						minutes .. "m " .. seconds .. "s"
+				else
+					effectText = "Effect: " .. spendingAmount .. " " .. (boosterInfo.name or boosterName) .. plural .. " for " ..
+						seconds .. "s"
+				end
+			else
+				effectText = "Effect: Use " .. spendingAmount .. " " .. (boosterInfo.name or boosterName) .. plural
+			end
+		end
+	end
+
+	infoEffectLabel.Text = effectText
+end
 
 -- Update a booster slot with the given data
 local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
@@ -96,6 +153,9 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 					if countLabel then
 						countLabel.Text = tostring(count - newSpending)
 					end
+
+					-- Update the info panel
+					UpdateUsageInfo(boosterName, newSpending)
 				end
 			end)
 
@@ -122,6 +182,9 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 					if countLabel then
 						countLabel.Text = tostring(count - newSpending)
 					end
+
+					-- Update the info panel
+					UpdateUsageInfo(boosterName, newSpending)
 				end
 			end)
 
@@ -144,6 +207,9 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 				if countLabel then
 					countLabel.Text = tostring(count)
 				end
+
+				-- Update the info panel
+				UpdateUsageInfo(boosterName, 0)
 			end)
 
 			-- Store connection in the metadata table
@@ -165,6 +231,9 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 				if countLabel then
 					countLabel.Text = "0"
 				end
+
+				-- Update the info panel
+				UpdateUsageInfo(boosterName, count)
 			end)
 
 			-- Store connection in the metadata table
@@ -198,6 +267,9 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 
 						-- Reset spending value to 0 after sending the event
 						spendingLabel.Text = "0"
+
+						-- Update the info panel
+						UpdateUsageInfo(boosterName, 0)
 					else
 						warn("UseBooster event not found in BoosterEvents")
 					end
@@ -209,6 +281,12 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 			-- Store connection in the metadata table
 			buttonConnections[useBtn] = connection
 		end
+	end
+
+	-- Initialize info panel with this booster's info if it's the first one
+	if boosterSlot:GetAttribute("IsFirstBooster") or 
+		(boosterSlot:GetAttribute("BoosterName") == boosterName and spendingValue > 0) then
+		UpdateUsageInfo(boosterName, spendingValue)
 	end
 
 	return boosterSlot
@@ -248,6 +326,23 @@ function BoosterInventory.Initialize(menuUI)
 	if not boostersContainer then
 		warn("Boosters container not found in BoosterInventory")
 		return
+	end
+
+	-- Find the UsageInfo panel
+	infoPanel = boostersFrame:FindFirstChild("UsageInfo")
+	if infoPanel then
+		infoDescLabel = infoPanel:FindFirstChild("DescLabel")
+		infoEffectLabel = infoPanel:FindFirstChild("EffectLabel")
+
+		if not infoDescLabel then
+			warn("DescLabel not found in UsageInfo")
+		end
+
+		if not infoEffectLabel then
+			warn("EffectLabel not found in UsageInfo")
+		end
+	else
+		warn("UsageInfo panel not found in BoosterInventory")
 	end
 
 	-- Find the Template within Boosters container (it might be stored in an ObjectValue)
@@ -337,6 +432,7 @@ function BoosterInventory.Populate()
 	end
 
 	-- Create slots for each booster with count > 0
+	local firstBooster = true
 	for boosterName, boosterCount in pairs(boosterCounts) do
 		-- Clone the template
 		local newSlot = template:Clone()
@@ -344,6 +440,14 @@ function BoosterInventory.Populate()
 		newSlot.Visible = true
 		newSlot:SetAttribute("IsTemplate", false)
 		newSlot:SetAttribute("BoosterName", boosterName)
+
+		-- Mark the first booster to update the info panel
+		if firstBooster then
+			newSlot:SetAttribute("IsFirstBooster", true)
+			firstBooster = false
+		else
+			newSlot:SetAttribute("IsFirstBooster", false)
+		end
 
 		-- Update the slot with booster info
 		UpdateBoosterSlot(newSlot, boosterName, boosterCount, spendingValues[boosterName])
@@ -358,7 +462,18 @@ function BoosterInventory.Populate()
 		boostersContainer.CanvasSize = UDim2.new(0, 0, 0, rows * (SLOT_HEIGHT + SLOT_PADDING))
 	end
 
+	-- If no boosters were populated, clear the info panel
+	if count == 0 and infoDescLabel and infoEffectLabel then
+		infoDescLabel.Text = "No boosters available"
+		infoEffectLabel.Text = ""
+	end
+
 	return count
+end
+
+-- Expose the UpdateUsageInfo function to allow external scripts to update the info panel
+function BoosterInventory.UpdateInfoPanel(boosterName, spendingAmount)
+	UpdateUsageInfo(boosterName, spendingAmount)
 end
 
 -- Refresh the booster inventory

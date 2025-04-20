@@ -1,8 +1,12 @@
--- /ReplicatedStorage/Modules/Core/Boosters/Crystals.lua
+-- /ReplicatedStorage/Modules/Core/BoosterDefs/Crystals.lua
 -- ModuleScript that defines the Crystal booster
 
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local IsServer = RunService:IsServer()
+
+-- Import utility module
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
 -- Get the PlayerSize module if we're on the server
 local PlayerSize
@@ -14,12 +18,25 @@ end
 return {
 	-- Shrink for 10s per crystal used. Stack duration only. Can cancel.
 	name = "Crystal",
-	description = "Shrink for 10s per crystal used.",
+	description = "Shrink for 10s per crystal.",
 	imageId = "rbxassetid://72049224483385",
 	boosterType = "PlayerBoost", -- Will be mapped to Boosters.BoosterTypes.PLAYER
 	duration = 10, -- 10 seconds per item used
 	stacks = false, -- effect does not stack
 	canCancel = true, -- can be canceled by player
+
+	-- Function to calculate and return effect description
+	calculateEffect = function(spendingAmount)
+		if spendingAmount <= 0 then
+			return "Select crystals to use"
+		end
+
+		local totalDuration = 10 * spendingAmount -- 10s per crystal
+		local timeText = Utility.FormatTimeDuration(totalDuration)
+
+		local pluralText = spendingAmount > 1 and "crystals" or "crystal"
+		return "Shrink for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. "."
+	end,
 
 	-- Function that runs when booster is activated
 	onActivate = function(player, qty)

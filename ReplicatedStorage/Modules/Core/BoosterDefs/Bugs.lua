@@ -2,18 +2,36 @@
 -- ModuleScript that defines the Bugs booster
 
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local IsServer = RunService:IsServer()
+
+-- Import utility module
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
 -- Booster definition 
 return {
 	-- Make this 1% for 1m per bug with a minimum of +1 speed
 	name = "Bug",
-	description = "+1 walkspeed for 1 minute per bug used",
+	description = "+1 speed for 1 minute per bug.",
 	imageId = "rbxassetid://109760311419104",
 	boosterType = "PlayerBoost", -- Will be mapped to Boosters.BoosterTypes.PLAYER
 	duration = 60, -- 60 seconds (1 minute) per bug
 	stacks = true, -- Allows stacking multiple bugs at once for stronger effect
 	canCancel = true,
+
+	-- Function to calculate and return effect description
+	calculateEffect = function(spendingAmount)
+		if spendingAmount <= 0 then
+			return "Select bugs to use"
+		end
+
+		local speedBoost = spendingAmount -- +1 walkspeed per bug
+		local totalDuration = 60 * spendingAmount -- 60s per bug
+		local timeText = Utility.FormatTimeDuration(totalDuration)
+
+		local pluralText = spendingAmount > 1 and "bugs" or "bug"
+		return "+" .. speedBoost .. " speed for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. "."
+	end,
 
 	-- Function that runs when booster is activated
 	onActivate = function(player, qty)
