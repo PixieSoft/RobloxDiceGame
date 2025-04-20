@@ -186,6 +186,28 @@ local function CreateSimpleBoosterDisplay(player)
 						Boosters.GiveBooster(player, boosterName, 1)
 					end)
 				end
+				
+				-- Create +10 button for regular boosters
+				if not isActiveIndicator then
+					local button = Instance.new("TextButton")
+					button.Name = "PlusButton"
+					button.Size = UDim2.new(0.2, 0, 1, 0)
+					button.Position = UDim2.new(0.6, 0, 0, 0)
+					button.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+					button.BackgroundTransparency = 0.7
+					button.BorderSizePixel = 1
+					button.Text = "+10"
+					button.TextColor3 = Color3.fromRGB(255, 255, 255)
+					button.TextSize = 14
+					button.Font = Enum.Font.GothamBold
+					button.Parent = row
+
+					-- Button click handler
+					button.MouseButton1Click:Connect(function()
+						-- Try to add 1 to the booster using the Boosters module
+						Boosters.GiveBooster(player, boosterName, 10)
+					end)
+				end
 			end
 
 			-- Update the label text
