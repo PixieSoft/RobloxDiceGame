@@ -8,52 +8,54 @@ local IsServer = RunService:IsServer()
 -- Import utility module
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
--- Booster definition 
-return {
-	-- drop a lava block. 1x1 default. 2x2 if spend 10. 3x3 for 100. 4x4 for 1000.
-	-- 5s per ball
-	-- generally used for jump boosting
-	-- use while jumping. summons in the air. can use this to hold yourself and jump again.
-	-- comes into existence colliding only with player. anchors immediately. then becomes
-	-- collidable with everything. keep it flat and aligned with the world. 
-	name = "Lava Ball",
-	description = "Create a platform under you for 5s per ball. Size doubles at 10, 100, and 1000 balls.",
-	imageId = "rbxassetid://73449632309262",
-	boosterType = "PlayerBoost", -- Will be mapped to Boosters.BoosterTypes.PLAYER
-	duration = 5, -- 5 seconds
-	stacks = false,
-	canCancel = true,
+-- Create a table that we can reference from within its own methods
+local LavaBallsBooster = {}
 
-	-- Function to calculate and return effect description
-	calculateEffect = function(spendingAmount)
-		if spendingAmount <= 0 then
-			return "Select lava balls to use"
-		end
+-- Define properties
+LavaBallsBooster.name = "Lava Ball"
+LavaBallsBooster.description = "Create platform under you for 5s per ball. Size increases at 10, 100, 1000."
+LavaBallsBooster.imageId = "rbxassetid://73449632309262"
+LavaBallsBooster.boosterType = "PlayerBoost" -- Will be mapped to Boosters.BoosterTypes.PLAYER
+LavaBallsBooster.duration = 5 -- 5 seconds
+LavaBallsBooster.stacks = false
+LavaBallsBooster.canCancel = true
 
-		local totalDuration = 5 * spendingAmount -- 5s per ball
-		local timeText = Utility.FormatTimeDuration(totalDuration)
-
-		local sizeText = "1x1"
-		if spendingAmount >= 1000 then
-			sizeText = "4x4 size"
-		elseif spendingAmount >= 100 then
-			sizeText = "3x3 size"
-		elseif spendingAmount >= 10 then
-			sizeText = "2x2 size"
-		end
-
-		local timeText = Utility.FormatTimeDuration(totalDuration) -- Always 5 seconds
-
-		local pluralText = spendingAmount > 1 and "lava balls" or "lava ball"
-		return "Create a " .. sizeText .. " platform under your feet for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. "."
-	end,
-
-	-- Function that runs when booster is activated
-	onActivate = function(player, qty)
-		-- This function only runs on the server
-		if not IsServer then return function() end end
-
-		-- Return a proper cleanup function
-		return function() end
+-- Function to calculate and return effect description
+LavaBallsBooster.calculateEffect = function(spendingAmount)
+	if spendingAmount <= 0 then
+		return "Select lava balls to use"
 	end
-}
+
+	local totalDuration = LavaBallsBooster.duration * spendingAmount -- Use self-referenced duration
+	local timeText = Utility.FormatTimeDuration(totalDuration)
+
+	local sizeText = "1x1"
+	if spendingAmount >= 1000 then
+		sizeText = "4x4 size"
+	elseif spendingAmount >= 100 then
+		sizeText = "3x3 size"
+	elseif spendingAmount >= 10 then
+		sizeText = "2x2 size"
+	end
+
+	local pluralText = spendingAmount > 1 and "lava balls" or "lava ball"
+	return "Create a " .. sizeText .. " platform for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. "."
+end
+
+-- Function that runs when booster is activated
+LavaBallsBooster.onActivate = function(player, qty)
+	-- This function only runs on the server
+	if not IsServer then return function() end end
+
+	-- Implementation of creating platforms would go here
+	-- This is a placeholder that would be filled with actual platform creation code
+
+	print("Activated Lava Ball booster for " .. player.Name .. " with " .. qty .. " balls")
+
+	-- Return a proper cleanup function
+	return function()
+		print("Lava Ball platforms cleaned up for " .. player.Name)
+	end
+end
+
+return LavaBallsBooster

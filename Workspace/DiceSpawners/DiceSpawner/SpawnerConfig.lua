@@ -12,13 +12,18 @@ local config = {
 	-- Setting to false makes the spawner use default configuration instead
 	configEnabled = false,
 
+	-- Region: Read a set of defaults for the region the die is spawned in.
+	-- Have the ability for this file to override the regional settings,
+	-- e.g. for boss spawns like Nyx.
+
 	-- Tier: Controls the base stats and number of rounds in combat
 	-- Valid options: 1, 2, 3, 4
 	tier = 3,
 
 	-- Category: Determines which set of face images to use from DieFaces
 	-- Valid options: "Dark", "Fire", "Light", "Metal", "Nature", "Rainbow", "TwinTailed", "Water"
-	category = "Light",
+	-- category = "Light", -- probably not doing this here
+	-- replace with lists by region
 
 	-- Special: The special ability this die will have
 	-- Valid options: "DoubleDefense", "Fireball", "None"
@@ -27,15 +32,19 @@ local config = {
 	-- AttackElement: The element type for this die's elemental attacks
 	-- Valid options: "Dark", "Fire", "Nature", "Light", "Metal", "Water"
 	attackElement = "Light",
+	-- use weighted chance function
 
 	-- ResistElement: The element type this die has resistance against
 	-- Valid options: "Dark", "Fire", "Nature", "Light", "Metal", "Water"
 	resistElement = "Dark",
+	-- region based; region bonus e.g. +5 defense, more likely to roll face, etc
+	-- equiv to frame bonus
 
 	-- StatPriority: Order of importance for stats (remaining stats will be added in default order)
 	-- Valid stats: "Healing", "Attack", "Defense", "Elemental"
 	-- Note: You don't need to specify all stats - unspecified ones will be added in default order
 	statPriority = { },
+	
 	
 	-- FrameStyle: Style of frame to apply to the dice.
 	-- THIS IS JUST FOR TESTING: Need to update the list of styles and have some kind of

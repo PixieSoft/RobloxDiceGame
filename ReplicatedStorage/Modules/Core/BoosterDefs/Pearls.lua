@@ -8,44 +8,50 @@ local IsServer = RunService:IsServer()
 -- Import utility module
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
--- Booster definition 
-return {
-	-- +1m underwater breathing (get 5m free) and a speed boost
-	-- also can buy longer base water breathing time
-	-- in center of game, there's a cup. it gets a pearl in it for every pearl people find.
-	-- anyone can fight the boss. if you win, you get all the pearls. split if multiplayer.
-	-- exclusive boss fights? optional for starter?
-	name = "Pearls",
-	description = "Add +1m of underwater breathing.",
-	imageId = "rbxassetid://109760311419104z",
-	boosterType = "DiceBoost",     -- Affects dice appearance or performance
-	duration = 60,
-	stacks = false,
-	canCancel = true,
+-- Create a table that we can reference from within its own methods
+local PearlsBooster = {}
 
-	-- Function to calculate and return effect description
-	calculateEffect = function(spendingAmount)
-		if spendingAmount <= 0 then
-			return "Select pearls to use"
-		end
+-- Define properties
+PearlsBooster.name = "Pearls"
+PearlsBooster.description = "Add +1m of underwater breathing."
+PearlsBooster.imageId = "rbxassetid://109760311419104z"
+PearlsBooster.boosterType = "DiceBoost" -- Affects dice appearance or performance
+PearlsBooster.duration = 60 -- 1 minute per pearl
+PearlsBooster.stacks = false
+PearlsBooster.canCancel = true
 
-		local totalDuration = 60 * spendingAmount -- 30 minutes per pearl
-		local timeText = Utility.FormatTimeDuration(totalDuration)
-
-		local pearlText = spendingAmount > 1 and "pearls" or "pearl"
-		return "Adds " .. timeText .. " of underwater breathing using " .. spendingAmount .. " " .. pearlText .. "."
-	end,
-
-	-- Function that runs when booster is activated
-	onActivate = function(player, qty)
-		-- This function only runs on the server
-		if not IsServer then return function() end end
-
-		-- Fire server event 
-		local UsePearlEvent = ReplicatedStorage.Events.Core:WaitForChild("UsePearlEvent")
-		UsePearlEvent:FireServer(player, qty)
-
-		-- Return a proper cleanup function
-		return function() end
+-- Function to calculate and return effect description
+PearlsBooster.calculateEffect = function(spendingAmount)
+	if spendingAmount <= 0 then
+		return "Select pearls to use"
 	end
-}
+
+	local totalDuration = PearlsBooster.duration * spendingAmount -- Self-referenced duration
+	local timeText = Utility.FormatTimeDuration(totalDuration)
+
+	local pearlText = spendingAmount > 1 and "pearls" or "pearl"
+	return "Adds " .. timeText .. " of underwater breathing using " .. spendingAmount .. " " .. pearlText .. "."
+end
+
+-- Function that runs when booster is activated
+PearlsBooster.onActivate = function(player, qty)
+	-- This function only runs on the server
+	if not IsServer then return function() end end
+
+	-- Check if the UsePearlEvent exists
+	local usePearlEvent = ReplicatedStorage.Events.Core:FindFirstChild("UsePearlEvent")
+
+	-- Fire server event if it exists
+	if usePearlEvent then
+		usePearlEvent:FireServer(player, qty)
+	else
+		print("Warning: UsePearlEvent not found for Pearl booster")
+	end
+
+	-- Return a proper cleanup function
+	return function()
+		print("Pearl booster effect ended for " .. player.Name)
+	end
+end
+
+return PearlsBooster
