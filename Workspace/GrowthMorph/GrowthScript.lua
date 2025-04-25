@@ -1,5 +1,3 @@
--- /Workspace/GrowthMorph/GrowthScript.lua
-
 --[[
 	Written by hunxrepair
 	2020/10/09
