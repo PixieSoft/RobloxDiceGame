@@ -10,9 +10,9 @@
 
 -- 0.5 is half size, 2 is double size
 
-local Width = 0.5 -- How wide your shoulders are
-local Height = 0.5 -- How tall you are
-local Depth = 0.5 -- How fat you are
+local Width = 0.25 -- How wide your shoulders are
+local Height = 0.25 -- How tall you are
+local Depth = 0.25 -- How fat you are
 local Head = nil -- Head size, auto calculated if set to nil (R15 only)
 
 --local Width = 1.5 -- How wide your shoulders are
