@@ -1,15 +1,28 @@
 -- /ServerScriptService/Modules/Effects/PlayerSize.lua
--- ModuleScript that provides functions to control player character size
+-- ModuleScript that provides functions to control player character size using the GrowthScript approach
 
 local PlayerSize = {}
 
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
--- Constants 
-local SHRINK_SCALE = 0.25
-local SHRINK_SPEED = 0.50
-local SHRINK_JUMP = 0.33
+-- Size configuration table for different character scales
+-- This can be extended in the future with more size options
+PlayerSize.SizeOptions = {
+	small = {
+		Width = 0.25,  -- How wide the shoulders are
+		Height = 0.25, -- How tall the player is
+		Depth = 0.25,  -- How thick the player is
+		Head = nil     -- Head size, auto calculated if nil (R15 only)
+	},
+	normal = {
+		Width = 1.0,
+		Height = 1.0,
+		Depth = 1.0,
+		Head = nil
+	}
+	-- Additional sizes can be added here in the future
+}
 
 -- Create shrunk players storage if it doesn't exist
 local function ensureShrunkPlayersStorage()
@@ -31,6 +44,156 @@ local function ensureScaleExists(humanoid, scaleName)
 		scale.Parent = humanoid
 	end
 	return scale
+end
+
+-- Apply R6 scaling to a character
+local function applyR6Scaling(character, sizeVector, isRestore)
+	-- Handle joint scaling
+	local motors = {}
+	table.insert(motors, character.HumanoidRootPart.RootJoint)
+
+	for _, motor in pairs(character.Torso:GetChildren()) do
+		if motor:IsA("Motor6D") then
+			table.insert(motors, motor)
+		end
+	end
+
+	for _, motor in pairs(motors) do
+		if isRestore then
+			-- Restore original C0 and C1 if they were saved
+			local originalC0 = motor:GetAttribute("OriginalC0")
+			local originalC1 = motor:GetAttribute("OriginalC1")
+
+			if originalC0 and originalC1 then
+				motor.C0 = originalC0
+				motor.C1 = originalC1
+			end
+		else
+			-- Save original values
+			motor:SetAttribute("OriginalC0", motor.C0)
+			motor:SetAttribute("OriginalC1", motor.C1)
+
+			-- Apply scaling
+			motor.C0 = CFrame.new((motor.C0.Position * sizeVector)) * (motor.C0 - motor.C0.Position)
+			motor.C1 = CFrame.new((motor.C1.Position * sizeVector)) * (motor.C1 - motor.C1.Position)
+		end
+	end
+
+	-- Handle part sizes
+	for _, part in pairs(character:GetChildren()) do
+		if part:IsA("BasePart") then
+			if isRestore then
+				-- Restore original size if it was saved
+				local originalSize = part:GetAttribute("OriginalSize")
+				if originalSize then
+					part.Size = originalSize
+				end
+			else
+				-- Save original size
+				part:SetAttribute("OriginalSize", part.Size)
+
+				-- Apply scaling
+				part.Size = part.Size * sizeVector
+			end
+		end
+	end
+
+	-- Handle head mesh
+	if character.Head:FindFirstChild("Mesh") and character.Head.Mesh.MeshId ~= "" then
+		if isRestore then
+			-- Restore original mesh scale if it was saved
+			local originalMeshScale = character.Head.Mesh:GetAttribute("OriginalScale")
+			if originalMeshScale then
+				character.Head.Mesh.Scale = originalMeshScale
+			end
+		else
+			-- Save original mesh scale
+			character.Head.Mesh:SetAttribute("OriginalScale", character.Head.Mesh.Scale)
+
+			-- Apply scaling
+			character.Head.Mesh.Scale = character.Head.Mesh.Scale * sizeVector
+		end
+	end
+
+	-- Handle accessories
+	for _, accessory in pairs(character:GetChildren()) do
+		if accessory:IsA("Accessory") then
+			local weld = accessory.Handle:FindFirstChild("AccessoryWeld")
+			local mesh = accessory.Handle:FindFirstChildOfClass("SpecialMesh")
+
+			if weld then
+				if isRestore then
+					-- Restore original weld C0 and C1 if they were saved
+					local originalC0 = weld:GetAttribute("OriginalC0")
+					local originalC1 = weld:GetAttribute("OriginalC1")
+
+					if originalC0 and originalC1 then
+						weld.C0 = originalC0
+						weld.C1 = originalC1
+					end
+				else
+					-- Save original values
+					weld:SetAttribute("OriginalC0", weld.C0)
+					weld:SetAttribute("OriginalC1", weld.C1)
+
+					-- Apply scaling
+					weld.C0 = CFrame.new((weld.C0.Position * sizeVector)) * (weld.C0 - weld.C0.Position)
+					weld.C1 = CFrame.new((weld.C1.Position * sizeVector)) * (weld.C1 - weld.C1.Position)
+				end
+			end
+
+			if mesh then
+				if isRestore then
+					-- Restore original mesh scale if it was saved
+					local originalMeshScale = mesh:GetAttribute("OriginalScale")
+					if originalMeshScale then
+						mesh.Scale = originalMeshScale
+					end
+				else
+					-- Save original mesh scale
+					mesh:SetAttribute("OriginalScale", mesh.Scale)
+
+					-- Apply scaling
+					mesh.Scale = mesh.Scale * sizeVector
+				end
+			end
+		end
+	end
+end
+
+-- Apply R15 scaling to a character
+local function applyR15Scaling(humanoid, sizeOptions, isRestore)
+	local description = humanoid:GetAppliedDescription()
+
+	if isRestore then
+		-- Restore original scales if they were saved
+		local originalDepthScale = humanoid:GetAttribute("OriginalDepthScale")
+		local originalHeadScale = humanoid:GetAttribute("OriginalHeadScale")
+		local originalHeightScale = humanoid:GetAttribute("OriginalHeightScale")
+		local originalWidthScale = humanoid:GetAttribute("OriginalWidthScale")
+
+		if originalDepthScale and originalHeadScale and originalHeightScale and originalWidthScale then
+			description.DepthScale = originalDepthScale
+			description.HeadScale = originalHeadScale
+			description.HeightScale = originalHeightScale
+			description.WidthScale = originalWidthScale
+		end
+	else
+		-- Save original scales
+		humanoid:SetAttribute("OriginalDepthScale", description.DepthScale)
+		humanoid:SetAttribute("OriginalHeadScale", description.HeadScale)
+		humanoid:SetAttribute("OriginalHeightScale", description.HeightScale)
+		humanoid:SetAttribute("OriginalWidthScale", description.WidthScale)
+
+		-- Apply scaling
+		description.DepthScale = description.DepthScale * sizeOptions.Depth
+		description.HeadScale = description.HeadScale * (sizeOptions.Head or math.max(sizeOptions.Width, sizeOptions.Depth))
+		description.HeightScale = description.HeightScale * sizeOptions.Height
+		description.WidthScale = description.WidthScale * sizeOptions.Width
+	end
+
+	-- Apply the description
+	humanoid:ApplyDescription(description)
 end
 
 -- Main function to set player size
@@ -60,13 +223,17 @@ function PlayerSize.SetPlayerSize(player, size)
 
 	-- Determine action based on requested size
 	local shouldShrink = false
+	local targetSize = "normal"
 
 	if size == "toggle" then
 		shouldShrink = not isCurrentlySmall
+		targetSize = shouldShrink and "small" or "normal"
 	elseif size == "small" then
 		shouldShrink = true
+		targetSize = "small"
 	elseif size == "normal" then
 		shouldShrink = false
+		targetSize = "normal"
 	else
 		warn("Invalid size parameter: '" .. size .. "'. Must be 'small', 'normal', or 'toggle'")
 		return false
@@ -77,73 +244,53 @@ function PlayerSize.SetPlayerSize(player, size)
 		return true -- Already in the desired state
 	end
 
+	-- Get size options from the table
+	local sizeOptions = PlayerSize.SizeOptions[targetSize]
+	if not sizeOptions then
+		warn("Size options not found for: " .. targetSize)
+		return false
+	end
+
+	-- Create size vector
+	local sizeVector = Vector3.new(sizeOptions.Width, sizeOptions.Height, sizeOptions.Depth)
+
 	if shouldShrink then
-		-- Shrink the player
+		-- Create marker in ShrunkPlayers folder
 		local marker = Instance.new("BoolValue")
 		marker.Name = tostring(player.UserId)
 		-- Store original speed as an attribute
 		marker:SetAttribute("OriginalSpeed", humanoid.WalkSpeed)
 		marker.Parent = shrunkPlayers
 
-		local scales = {
-			ensureScaleExists(humanoid, "HeadScale"),
-			ensureScaleExists(humanoid, "BodyHeightScale"),
-			ensureScaleExists(humanoid, "BodyWidthScale"),
-			ensureScaleExists(humanoid, "BodyDepthScale")
-		}
-
-		for _, scale in ipairs(scales) do
-			scale.Value = scale.Value * SHRINK_SCALE
-		end
-
-		humanoid.WalkSpeed = humanoid.WalkSpeed * SHRINK_SPEED
-		humanoid.JumpPower = humanoid.JumpPower * SHRINK_JUMP
-
-		for _, part in pairs(character:GetChildren()) do
-			if part:IsA("BasePart") then
-				part.CustomPhysicalProperties = PhysicalProperties.new(13, 0.3, 0.5)
-			end
+		-- Apply size change based on rig type
+		if humanoid.RigType == Enum.HumanoidRigType.R6 then
+			applyR6Scaling(character, sizeVector, false)
+		elseif humanoid.RigType == Enum.HumanoidRigType.R15 then
+			applyR15Scaling(humanoid, sizeOptions, false)
 		end
 
 		return true
 	else
-		-- Grow back to normal
-		if not shrunkData then
+		-- Remove marker from ShrunkPlayers folder
+		if shrunkData then
+			local originalSpeed = shrunkData:GetAttribute("OriginalSpeed") or 16
+			shrunkData:Destroy()
+
+			-- Restore character size based on rig type
+			if humanoid.RigType == Enum.HumanoidRigType.R6 then
+				applyR6Scaling(character, sizeVector, true)
+			elseif humanoid.RigType == Enum.HumanoidRigType.R15 then
+				applyR15Scaling(humanoid, sizeOptions, true)
+			end
+
+			-- Restore walk speed (we'll keep this from the original implementation)
+			humanoid.WalkSpeed = originalSpeed
+
+			return true
+		else
 			warn("Cannot restore size: No shrunk data found for player", player.Name)
 			return false
 		end
-
-		local originalSpeed = shrunkData:GetAttribute("OriginalSpeed") or 16
-		shrunkData:Destroy()
-
-		local scales = {
-			humanoid:FindFirstChild("HeadScale"),
-			humanoid:FindFirstChild("BodyHeightScale"),
-			humanoid:FindFirstChild("BodyWidthScale"),
-			humanoid:FindFirstChild("BodyDepthScale")
-		}
-
-		-- Ensure all scales exist before setting values
-		for i, scaleName in ipairs({"HeadScale", "BodyHeightScale", "BodyWidthScale", "BodyDepthScale"}) do
-			if not scales[i] then
-				scales[i] = ensureScaleExists(humanoid, scaleName)
-			end
-		end
-
-		for _, scale in ipairs(scales) do
-			scale.Value = 1
-		end
-
-		humanoid.WalkSpeed = originalSpeed
-		humanoid.JumpPower = 50
-
-		for _, part in pairs(character:GetChildren()) do
-			if part:IsA("BasePart") then
-				part.CustomPhysicalProperties = nil
-			end
-		end
-
-		return true
 	end
 end
 
@@ -190,7 +337,7 @@ end
 do
 	ensureShrunkPlayersStorage()
 	initializeRemoteEvent()
-	print("PlayerSize module initialized")
+	print("PlayerSize module initialized with enhanced scaling features")
 end
 
 return PlayerSize

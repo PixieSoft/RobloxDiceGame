@@ -46,125 +46,89 @@ uiCorner.Parent = statsFrame
 
 -- Function to safely get the total mass of a character
 local function getTotalMass(character)
-    if not character then return 0 end
+	if not character then return 0 end
 
-    local totalMass = 0
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local success, mass = pcall(function() return part.Mass end)
-            if success and mass then
-                totalMass = totalMass + mass
-            end
-        end
-    end
-    return totalMass
+	local totalMass = 0
+	for _, part in pairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local success, mass = pcall(function() return part.Mass end)
+			if success and mass then
+				totalMass = totalMass + mass
+			end
+		end
+	end
+	return totalMass
 end
 
 -- Function to calculate the total volume of character parts
 local function getTotalVolume(character)
-    if not character then return 0 end
-    
-    local totalVolume = 0
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local success, size = pcall(function() return part.Size end)
-            if success and size then
-                totalVolume = totalVolume + (size.X * size.Y * size.Z)
-            end
-        end
-    end
-    return totalVolume
+	if not character then return 0 end
+
+	local totalVolume = 0
+	for _, part in pairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local success, size = pcall(function() return part.Size end)
+			if success and size then
+				totalVolume = totalVolume + (size.X * size.Y * size.Z)
+			end
+		end
+	end
+	return totalVolume
 end
 
 -- Function to calculate the effective density based on mass and volume
 local function calculateDensity(character)
-    local mass = getTotalMass(character)
-    local volume = getTotalVolume(character)
-    
-    -- Prevent division by zero
-    if volume <= 0 then return 0 end
-    
-    return mass / volume
-end
+	local mass = getTotalMass(character)
+	local volume = getTotalVolume(character)
 
--- Function to get density - prioritizes custom values, falls back to calculation
-local function getCharacterDensity(character)
-    if not character then return 0 end
-    
-    -- First check if any parts have CustomPhysicalProperties
-    local totalCustomDensity = 0
-    local customDensityPartCount = 0
-    
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local success, hasCustomProps = pcall(function() 
-                return part.CustomPhysicalProperties ~= nil 
-            end)
-            
-            if success and hasCustomProps then
-                local densitySuccess, density = pcall(function()
-                    return part.CustomPhysicalProperties.Density
-                end)
-                
-                if densitySuccess and density then
-                    totalCustomDensity = totalCustomDensity + density
-                    customDensityPartCount = customDensityPartCount + 1
-                end
-            end
-        end
-    end
-    
-    -- If we found custom density values, return their average
-    if customDensityPartCount > 0 then
-        return totalCustomDensity / customDensityPartCount
-    end
-    
-    -- Fall back to mass/volume calculation if no custom density found
-    return calculateDensity(character)
+	-- Prevent division by zero
+	if volume <= 0 then return 0 end
+
+	return mass / volume
 end
 
 -- Configuration for the stats we want to track
 local statConfigs = {
-    {
-        name = "WalkSpeed",
-        displayName = "Speed",
-        default = 16,
-        min = 1,
-        max = 100,
-        editable = true
-    },
-    {
-        name = "JumpHeight", 
-        displayName = "Height",
-        default = 7.2,
-        min = 0,
-        max = 50,
-        editable = true
-    },
-    {
-        name = "JumpPower",
-        displayName = "Power",
-        default = 50,
-        min = 0,
-        max = 250,
-        editable = true
-    },
-    {
-        name = "TotalMass", -- This isn't a real property, we handle it specially
-        displayName = "Mass",
-        default = 1,
-        min = 0.1,
-        max = 100,
-        editable = false
-    },
-    {
-        name = "Density", -- This is the sum of all densities
-        displayName = "Density",
-        default = 1,
-        min = 0.1,
-        max = 1000,
-        editable = false
-    }
+	{
+		name = "WalkSpeed",
+		displayName = "Speed",
+		default = 16,
+		min = 1,
+		max = 100,
+		editable = true
+	},
+	{
+		name = "JumpHeight", 
+		displayName = "Height",
+		default = 7.2,
+		min = 0,
+		max = 50,
+		editable = true
+	},
+	{
+		name = "JumpPower",
+		displayName = "Power",
+		default = 50,
+		min = 0,
+		max = 250,
+		editable = true
+	},
+	{
+		name = "TotalMass", -- This isn't a real property, we handle it specially
+		displayName = "Mass",
+		default = 1,
+		min = 0.1,
+		max = 100,
+		editable = false
+	},
+	{
+		name = "Density", -- This is the sum of all densities
+		displayName = "Density",
+		default = 1,
+		min = 0.1,
+		max = 1000,
+		editable = false
+	}
 }
 
 -- Create a container for the stat rows
@@ -178,271 +142,271 @@ statsContainer.Parent = statsFrame
 -- Create rows for each stat
 local statRows = {}
 for i, config in ipairs(statConfigs) do
-    local row = Instance.new("Frame")
-    row.Name = config.name .. "Row"
-    row.Size = UDim2.new(1, 0, 1/#statConfigs, 0)
-    row.Position = UDim2.new(0, 0, (i-1)/#statConfigs, 0)
-    row.BackgroundTransparency = 1
-    row.Parent = statsContainer
+	local row = Instance.new("Frame")
+	row.Name = config.name .. "Row"
+	row.Size = UDim2.new(1, 0, 1/#statConfigs, 0)
+	row.Position = UDim2.new(0, 0, (i-1)/#statConfigs, 0)
+	row.BackgroundTransparency = 1
+	row.Parent = statsContainer
 
-    -- Label for stat name
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Name = "NameLabel"
-    nameLabel.Size = UDim2.new(0.25, 0, 1, 0)
-    nameLabel.Position = UDim2.new(0, 0, 0, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Font = Enum.Font.Gotham
-    nameLabel.Text = config.displayName .. ":"
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.TextSize = 14
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    nameLabel.TextYAlignment = Enum.TextYAlignment.Center
-    nameLabel.Parent = row
+	-- Label for stat name
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "NameLabel"
+	nameLabel.Size = UDim2.new(0.25, 0, 1, 0)
+	nameLabel.Position = UDim2.new(0, 0, 0, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Font = Enum.Font.Gotham
+	nameLabel.Text = config.displayName .. ":"
+	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	nameLabel.TextSize = 14
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.TextYAlignment = Enum.TextYAlignment.Center
+	nameLabel.Parent = row
 
-    -- Display current value
-    local valueLabel = Instance.new("TextLabel")
-    valueLabel.Name = "ValueLabel"
-    valueLabel.Size = UDim2.new(0.15, 0, 1, 0)
-    valueLabel.Position = UDim2.new(0.25, 0, 0, 0)
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.Font = Enum.Font.Gotham
-    valueLabel.Text = tostring(config.default)
-    valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    valueLabel.TextSize = 14
-    valueLabel.TextXAlignment = Enum.TextXAlignment.Center
-    valueLabel.TextYAlignment = Enum.TextYAlignment.Center
-    valueLabel.Parent = row
+	-- Display current value
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Name = "ValueLabel"
+	valueLabel.Size = UDim2.new(0.15, 0, 1, 0)
+	valueLabel.Position = UDim2.new(0.25, 0, 0, 0)
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Font = Enum.Font.Gotham
+	valueLabel.Text = tostring(config.default)
+	valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	valueLabel.TextSize = 14
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Center
+	valueLabel.TextYAlignment = Enum.TextYAlignment.Center
+	valueLabel.Parent = row
 
-    -- Only add input box and save button if the stat is editable
-    if config.editable then
-        -- Input box for new value
-        local inputBox = Instance.new("TextBox")
-        inputBox.Name = "InputBox"
-        inputBox.Size = UDim2.new(0.20, 0, 0.6, 0)
-        inputBox.Position = UDim2.new(0.40, 5, 0.2, 0)
-        inputBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        inputBox.BackgroundTransparency = 0.5
-        inputBox.BorderSizePixel = 0
-        inputBox.Font = Enum.Font.Gotham
-        inputBox.PlaceholderText = "New Value"
-        inputBox.Text = ""
-        inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-        inputBox.TextSize = 12
-        inputBox.ClearTextOnFocus = true
-        inputBox.Parent = row
+	-- Only add input box and save button if the stat is editable
+	if config.editable then
+		-- Input box for new value
+		local inputBox = Instance.new("TextBox")
+		inputBox.Name = "InputBox"
+		inputBox.Size = UDim2.new(0.20, 0, 0.6, 0)
+		inputBox.Position = UDim2.new(0.40, 5, 0.2, 0)
+		inputBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		inputBox.BackgroundTransparency = 0.5
+		inputBox.BorderSizePixel = 0
+		inputBox.Font = Enum.Font.Gotham
+		inputBox.PlaceholderText = "New Value"
+		inputBox.Text = ""
+		inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+		inputBox.TextSize = 12
+		inputBox.ClearTextOnFocus = true
+		inputBox.Parent = row
 
-        -- Add rounded corners to input box
-        local boxCorner = Instance.new("UICorner")
-        boxCorner.CornerRadius = UDim.new(0, 4)
-        boxCorner.Parent = inputBox
+		-- Add rounded corners to input box
+		local boxCorner = Instance.new("UICorner")
+		boxCorner.CornerRadius = UDim.new(0, 4)
+		boxCorner.Parent = inputBox
 
-        -- Save button
-        local saveButton = Instance.new("TextButton")
-        saveButton.Name = "SaveButton"
-        saveButton.Size = UDim2.new(0.15, -10, 0.6, 0)
-        saveButton.Position = UDim2.new(0.85, 0, 0.2, 0)
-        saveButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
-        saveButton.BackgroundTransparency = 0.3
-        saveButton.BorderSizePixel = 0
-        saveButton.Font = Enum.Font.GothamBold
-        saveButton.Text = "Save"
-        saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        saveButton.TextSize = 12
-        saveButton.AutoButtonColor = true
-        saveButton.Parent = row
+		-- Save button
+		local saveButton = Instance.new("TextButton")
+		saveButton.Name = "SaveButton"
+		saveButton.Size = UDim2.new(0.15, -10, 0.6, 0)
+		saveButton.Position = UDim2.new(0.85, 0, 0.2, 0)
+		saveButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+		saveButton.BackgroundTransparency = 0.3
+		saveButton.BorderSizePixel = 0
+		saveButton.Font = Enum.Font.GothamBold
+		saveButton.Text = "Save"
+		saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		saveButton.TextSize = 12
+		saveButton.AutoButtonColor = true
+		saveButton.Parent = row
 
-        -- Add rounded corners to save button
-        local buttonCorner = Instance.new("UICorner")
-        buttonCorner.CornerRadius = UDim.new(0, 4)
-        buttonCorner.Parent = saveButton
+		-- Add rounded corners to save button
+		local buttonCorner = Instance.new("UICorner")
+		buttonCorner.CornerRadius = UDim.new(0, 4)
+		buttonCorner.Parent = saveButton
 
-        -- Store references to update later
-        statRows[config.name] = {
-            valueLabel = valueLabel,
-            inputBox = inputBox,
-            saveButton = saveButton,
-            config = config
-        }
+		-- Store references to update later
+		statRows[config.name] = {
+			valueLabel = valueLabel,
+			inputBox = inputBox,
+			saveButton = saveButton,
+			config = config
+		}
 
-        -- Handle save button click
-        saveButton.MouseButton1Click:Connect(function()
-            local success, value = pcall(function()
-                return tonumber(inputBox.Text)
-            end)
+		-- Handle save button click
+		saveButton.MouseButton1Click:Connect(function()
+			local success, value = pcall(function()
+				return tonumber(inputBox.Text)
+			end)
 
-            if success and value then
-                -- Check bounds
-                value = math.clamp(value, config.min, config.max)
+			if success and value then
+				-- Check bounds
+				value = math.clamp(value, config.min, config.max)
 
-                -- Apply new value to character
-                local character = player.Character
-                if character then
-                    -- Regular humanoid property
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        humanoid[config.name] = value
-                    end
-                end
+				-- Apply new value to character
+				local character = player.Character
+				if character then
+					-- Regular humanoid property
+					local humanoid = character:FindFirstChildOfClass("Humanoid")
+					if humanoid then
+						humanoid[config.name] = value
+					end
+				end
 
-                -- Clear input box
-                inputBox.Text = ""
+				-- Clear input box
+				inputBox.Text = ""
 
-                -- Flash the button green to indicate success
-                local originalColor = saveButton.BackgroundColor3
-                saveButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+				-- Flash the button green to indicate success
+				local originalColor = saveButton.BackgroundColor3
+				saveButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
 
-                -- Create tween to return to original color
-                local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                local tween = TweenService:Create(saveButton, tweenInfo, {
-                    BackgroundColor3 = originalColor
-                })
-                tween:Play()
-            else
-                -- Flash the button red to indicate error
-                local originalColor = saveButton.BackgroundColor3
-                saveButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+				-- Create tween to return to original color
+				local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				local tween = TweenService:Create(saveButton, tweenInfo, {
+					BackgroundColor3 = originalColor
+				})
+				tween:Play()
+			else
+				-- Flash the button red to indicate error
+				local originalColor = saveButton.BackgroundColor3
+				saveButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
-                -- Create tween to return to original color
-                local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                local tween = TweenService:Create(saveButton, tweenInfo, {
-                    BackgroundColor3 = originalColor
-                })
-                tween:Play()
+				-- Create tween to return to original color
+				local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				local tween = TweenService:Create(saveButton, tweenInfo, {
+					BackgroundColor3 = originalColor
+				})
+				tween:Play()
 
-                -- Clear input box
-                inputBox.Text = ""
-            end
-        end)
-    else
-        -- For non-editable stats (Mass and Density), just store references to valueLabel
-        statRows[config.name] = {
-            valueLabel = valueLabel,
-            config = config
-        }
-        
-        -- Add a "read-only" indicator
-        local readOnlyLabel = Instance.new("TextLabel")
-        readOnlyLabel.Name = "ReadOnlyLabel"
-        readOnlyLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
-        readOnlyLabel.Position = UDim2.new(0.40, 5, 0.2, 0)
-        readOnlyLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        readOnlyLabel.BackgroundTransparency = 0.7
-        readOnlyLabel.BorderSizePixel = 0
-        readOnlyLabel.Font = Enum.Font.Gotham
-        readOnlyLabel.Text = "(Read-only)"
-        readOnlyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        readOnlyLabel.TextSize = 11
-        readOnlyLabel.TextXAlignment = Enum.TextXAlignment.Center
-        readOnlyLabel.Parent = row
-        
-        -- Add rounded corners to read-only label
-        local labelCorner = Instance.new("UICorner")
-        labelCorner.CornerRadius = UDim.new(0, 4)
-        labelCorner.Parent = readOnlyLabel
-    end
+				-- Clear input box
+				inputBox.Text = ""
+			end
+		end)
+	else
+		-- For non-editable stats (Mass and Density), just store references to valueLabel
+		statRows[config.name] = {
+			valueLabel = valueLabel,
+			config = config
+		}
+
+		-- Add a "read-only" indicator
+		local readOnlyLabel = Instance.new("TextLabel")
+		readOnlyLabel.Name = "ReadOnlyLabel"
+		readOnlyLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
+		readOnlyLabel.Position = UDim2.new(0.40, 5, 0.2, 0)
+		readOnlyLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		readOnlyLabel.BackgroundTransparency = 0.7
+		readOnlyLabel.BorderSizePixel = 0
+		readOnlyLabel.Font = Enum.Font.Gotham
+		readOnlyLabel.Text = "(Read-only)"
+		readOnlyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+		readOnlyLabel.TextSize = 11
+		readOnlyLabel.TextXAlignment = Enum.TextXAlignment.Center
+		readOnlyLabel.Parent = row
+
+		-- Add rounded corners to read-only label
+		local labelCorner = Instance.new("UICorner")
+		labelCorner.CornerRadius = UDim.new(0, 4)
+		labelCorner.Parent = readOnlyLabel
+	end
 end
 
 -- Functions to update displayed values
 local function updateHumanoidStats()
-    local character = player.Character
-    if not character then return end
+	local character = player.Character
+	if not character then return end
 
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
 
-    -- Update only real humanoid properties
-    for statName, row in pairs(statRows) do
-        if statName ~= "TotalMass" and statName ~= "Density" then -- Skip the mass and density properties
-            local success, value = pcall(function() return humanoid[statName] end)
-            if success and value ~= nil then
-                row.valueLabel.Text = string.format("%.1f", value)
-            end
-        end
-    end
+	-- Update only real humanoid properties
+	for statName, row in pairs(statRows) do
+		if statName ~= "TotalMass" and statName ~= "Density" then -- Skip the mass and density properties
+			local success, value = pcall(function() return humanoid[statName] end)
+			if success and value ~= nil then
+				row.valueLabel.Text = string.format("%.1f", value)
+			end
+		end
+	end
 end
 
 -- Function to update mass and density displays
 local function updateMassAndDensity()
-    local character = player.Character
-    if not character then return end
+	local character = player.Character
+	if not character then return end
 
-    local massRow = statRows["TotalMass"]
-    local densityRow = statRows["Density"]
-    
-    if massRow then
-        local currentMass = getTotalMass(character)
-        massRow.valueLabel.Text = string.format("%.1f", currentMass)
-    end
-    
-    if densityRow then
-        local currentDensity = getCharacterDensity(character)
-        densityRow.valueLabel.Text = string.format("%.3f", currentDensity)
-    end
+	local massRow = statRows["TotalMass"]
+	local densityRow = statRows["Density"]
+
+	if massRow then
+		local currentMass = getTotalMass(character)
+		massRow.valueLabel.Text = string.format("%.1f", currentMass)
+	end
+
+	if densityRow then
+		local currentDensity = calculateDensity(character)
+		densityRow.valueLabel.Text = string.format("%.3f", currentDensity)
+	end
 end
 
 -- Set up event connections for player
 player.CharacterAdded:Connect(function(character)
-    -- Wait for the humanoid to be added
-    local humanoid = character:WaitForChild("Humanoid")
+	-- Wait for the humanoid to be added
+	local humanoid = character:WaitForChild("Humanoid")
 
-    -- Set up property change detection for humanoid stats
-    for statName, row in pairs(statRows) do
-        -- Skip TotalMass and Density as they're not real properties
-        if statName ~= "TotalMass" and statName ~= "Density" then
-            humanoid:GetPropertyChangedSignal(statName):Connect(function()
-                local success, value = pcall(function() return humanoid[statName] end)
-                if success and value ~= nil then
-                    row.valueLabel.Text = string.format("%.1f", value)
-                end
-            end)
-        end
-    end
+	-- Set up property change detection for humanoid stats
+	for statName, row in pairs(statRows) do
+		-- Skip TotalMass and Density as they're not real properties
+		if statName ~= "TotalMass" and statName ~= "Density" then
+			humanoid:GetPropertyChangedSignal(statName):Connect(function()
+				local success, value = pcall(function() return humanoid[statName] end)
+				if success and value ~= nil then
+					row.valueLabel.Text = string.format("%.1f", value)
+				end
+			end)
+		end
+	end
 
-    -- Initial update
-    updateHumanoidStats()
-    updateMassAndDensity()
+	-- Initial update
+	updateHumanoidStats()
+	updateMassAndDensity()
 end)
 
 -- Initial update if character already exists
 if player.Character then
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        -- Set up property change detection for humanoid stats
-        for statName, row in pairs(statRows) do
-            -- Skip TotalMass and Density as they're not real properties
-            if statName ~= "TotalMass" and statName ~= "Density" then
-                humanoid:GetPropertyChangedSignal(statName):Connect(function()
-                    local success, value = pcall(function() return humanoid[statName] end)
-                    if success and value ~= nil then
-                        row.valueLabel.Text = string.format("%.1f", value)
-                    end
-                end)
-            end
-        end
+	local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		-- Set up property change detection for humanoid stats
+		for statName, row in pairs(statRows) do
+			-- Skip TotalMass and Density as they're not real properties
+			if statName ~= "TotalMass" and statName ~= "Density" then
+				humanoid:GetPropertyChangedSignal(statName):Connect(function()
+					local success, value = pcall(function() return humanoid[statName] end)
+					if success and value ~= nil then
+						row.valueLabel.Text = string.format("%.1f", value)
+					end
+				end)
+			end
+		end
 
-        -- Initial update
-        updateHumanoidStats()
-        updateMassAndDensity()
-    end
+		-- Initial update
+		updateHumanoidStats()
+		updateMassAndDensity()
+	end
 end
 
 -- Set up periodic humanoid stats update
 RunService.Heartbeat:Connect(function()
-    if tick() % UPDATE_INTERVAL < 0.01 then
-        updateHumanoidStats()
-    end
+	if tick() % UPDATE_INTERVAL < 0.01 then
+		updateHumanoidStats()
+	end
 end)
 
 -- Set up separate mass and density update timer (every 1 second)
 local massUpdateConnection = RunService.Heartbeat:Connect(function()
-    if tick() % MASS_DENSITY_UPDATE_INTERVAL < 0.01 then
-        updateMassAndDensity()
-    end
+	if tick() % MASS_DENSITY_UPDATE_INTERVAL < 0.01 then
+		updateMassAndDensity()
+	end
 end)
 
 -- Toggle visibility function
 local function toggleVisibility()
-    statsFrame.Visible = not statsFrame.Visible
+	statsFrame.Visible = not statsFrame.Visible
 end
 
 -- Expose toggle function via _G for other scripts
@@ -453,11 +417,11 @@ statsFrame.Visible = true
 
 -- Clean up connections when script is destroyed
 script.AncestryChanged:Connect(function(_, newParent)
-    if newParent == nil then
-        if massUpdateConnection then
-            massUpdateConnection:Disconnect()
-        end
-    end
+	if newParent == nil then
+		if massUpdateConnection then
+			massUpdateConnection:Disconnect()
+		end
+	end
 end)
 
 print("Character Stats GUI initialized with mass and density display")
