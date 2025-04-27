@@ -1,4 +1,4 @@
--- /ReplicatedStorage/Modules/Core/SizeSlider.lua
+-- /ReplicatedStorage/Modules/UI/SizeSlider.lua
 -- ModuleScript that creates and manages a character size slider UI component
 
 local SizeSlider = {}
@@ -14,7 +14,7 @@ local ScaleCharacter = require(ReplicatedStorage.Modules.Core.ScaleCharacter)
 local player = Players.LocalPlayer
 
 -- Configuration
-SizeSlider.DetentValues = {0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+SizeSlider.DetentValues = {0.25, 0.5, 0.75, 1, 2, 4, 8}
 SizeSlider.DefaultSizeIndex = 4 -- Index for size 1 (normal)
 
 -- Variables
@@ -270,4 +270,4 @@ if RunService:IsClient() then
 end
 
 return SizeSlider
--- /ReplicatedStorage/Modules/Core/SizeSlider.lua
+-- /ReplicatedStorage/Modules/UI/SizeSlider.lua
