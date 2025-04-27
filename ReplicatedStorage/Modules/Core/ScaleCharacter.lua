@@ -155,40 +155,33 @@ local function ensureScaleStatsExist(player)
 	-- Get or create ScaleName stat (StringValue)
 	local scaleNameStat = Stat.Get(player, "ScaleName")
 	if not scaleNameStat then
-		-- Find Stats folder path
+		-- Find player data folder
 		local playerData = Stat.GetDataFolder(player)
 		if not playerData then
 			warn("ScaleCharacter: Failed to get player data folder")
 			return false
 		end
 
-		local statsFolder = playerData:FindFirstChild("Stats")
-		if not statsFolder then
-			warn("ScaleCharacter: Stats folder not found")
-			return false
-		end
-
-		-- Create ScaleName stat
+		-- Create ScaleName stat directly under player data folder
 		scaleNameStat = Instance.new("StringValue")
 		scaleNameStat.Name = "ScaleName"
 		scaleNameStat.Value = "normal" -- Default value
-		scaleNameStat.Parent = statsFolder
-		print("Created ScaleName stat for " .. player.Name)
+		scaleNameStat.Parent = playerData
+		print("Created ScaleName stat for " .. player.Name .. " directly under player data folder")
 	end
 
 	-- Get or create ScaleValue stat (NumberValue)
 	local scaleValueStat = Stat.Get(player, "ScaleValue")
 	if not scaleValueStat then
-		-- Find Stats folder path
+		-- Find player data folder
 		local playerData = Stat.GetDataFolder(player)
-		local statsFolder = playerData:FindFirstChild("Stats")
 
-		-- Create ScaleValue stat
+		-- Create ScaleValue stat directly under player data folder
 		scaleValueStat = Instance.new("NumberValue")
 		scaleValueStat.Name = "ScaleValue"
 		scaleValueStat.Value = 1 -- Default value (normal scale)
-		scaleValueStat.Parent = statsFolder
-		print("Created ScaleValue stat for " .. player.Name)
+		scaleValueStat.Parent = playerData
+		print("Created ScaleValue stat for " .. player.Name .. " directly under player data folder")
 	end
 
 	return true

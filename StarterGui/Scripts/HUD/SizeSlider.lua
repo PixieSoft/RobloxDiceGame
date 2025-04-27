@@ -205,20 +205,28 @@ end
 local isDragging = false
 local currentScale = 1
 
--- Function to get capitalized preset name
-local function getCapitalizedPresetName()
+-- Function to get capitalized preset name and scale value
+local function getScaleDisplayInfo()
 	-- Wait for player data to load
-	if not Stat.WaitForLoad(player) then return "Normal" end
+	if not Stat.WaitForLoad(player) then return "Normal", 1 end
 
 	-- Get the scale name from player's data
 	local scaleNameStat = Stat.Get(player, "ScaleName")
+	local scaleValueStat = Stat.Get(player, "ScaleValue")
+
+	local presetName = "Normal" -- Default name
+	local scaleValue = 1 -- Default value
 
 	if scaleNameStat and scaleNameStat.Value ~= "" then
-		local presetName = scaleNameStat.Value
-		return presetName:sub(1, 1):upper() .. presetName:sub(2)
-	else
-		return "Normal" -- Default if no data found
+		local rawName = scaleNameStat.Value
+		presetName = rawName:sub(1, 1):upper() .. rawName:sub(2)
 	end
+
+	if scaleValueStat and scaleValueStat.Value ~= 0 then
+		scaleValue = scaleValueStat.Value
+	end
+
+	return presetName, scaleValue
 end
 
 -- Function to update slider UI based on scale value
@@ -233,11 +241,11 @@ function UpdateSliderUI(scale)
 	-- Update knob position
 	sliderKnob.Position = UDim2.new(normalizedValue, -8, 0.5, -8)
 
-	-- Get the preset name from player data
-	local presetName = getCapitalizedPresetName()
+	-- Get the preset name and scale value from player data
+	local presetName, scaleValue = getScaleDisplayInfo()
 
-	-- Update title label with just the preset name (capitalized)
-	titleLabel.Text = presetName
+	-- Update title label with the preset name and scale value
+	titleLabel.Text = presetName .. " (" .. string.format("%.2f", scaleValue) .. ")"
 
 	-- Update value label
 	valueLabel.Text = string.format("%.2fx", scale)

@@ -5,6 +5,10 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Import the ScaleCharacter module for character scaling
+local ScaleCharacter = require(ReplicatedStorage.Modules.Core.ScaleCharacter)
 
 -- Define default physical properties
 local DefaultPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
@@ -108,23 +112,6 @@ local function getFrictionForScaleAndSpeed(scale, speed)
 	return PhysicalProperties.new(0.7, friction, 0.5, frictionWeight, 1)
 end
 
--- Function to get character scale - simplified as requested
-local function getCharacterScale(character)
-	if not character then return 1 end
-
-	-- Try to get scale through Model:GetScale() method
-	local success, scale = pcall(function()
-		return character:GetScale()
-	end)
-
-	if success and scale then
-		return scale
-	end
-
-	-- Default to 1 if no scale can be determined
-	return 1
-end
-
 -- Function to check the part below player and apply properties
 local function checkPartBelowPlayer()
 	local player = Players.LocalPlayer
@@ -140,8 +127,8 @@ local function checkPartBelowPlayer()
 		return
 	end
 
-	-- Get the current character scale and walk speed
-	local characterScale = getCharacterScale(character)
+	-- Get the current character scale using ScaleCharacter module
+	local characterScale = ScaleCharacter.GetScale(player)
 	local walkSpeed = humanoid.WalkSpeed
 
 	local rootPart = character.HumanoidRootPart
@@ -192,4 +179,5 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
-print("Ice friction controller initialized with clean data table")
+print("Ice friction controller initialized with ScaleCharacter module")
+-- /StarterPlayer/StarterPlayerScripts/IceFrictionController.lua
