@@ -142,6 +142,58 @@ local function findClosestPresetName(scaleValue)
 	return closestName
 end
 
+-- Function to ensure the scale-related stats exist for a player
+local function ensureScaleStatsExist(player)
+	if not IsServer then return end
+
+	-- Wait for player data to load
+	if not Stat.WaitForLoad(player) then
+		warn("ScaleCharacter: Failed to wait for player data to load")
+		return false
+	end
+
+	-- Get or create ScaleName stat (StringValue)
+	local scaleNameStat = Stat.Get(player, "ScaleName")
+	if not scaleNameStat then
+		-- Find Stats folder path
+		local playerData = Stat.GetDataFolder(player)
+		if not playerData then
+			warn("ScaleCharacter: Failed to get player data folder")
+			return false
+		end
+
+		local statsFolder = playerData:FindFirstChild("Stats")
+		if not statsFolder then
+			warn("ScaleCharacter: Stats folder not found")
+			return false
+		end
+
+		-- Create ScaleName stat
+		scaleNameStat = Instance.new("StringValue")
+		scaleNameStat.Name = "ScaleName"
+		scaleNameStat.Value = "normal" -- Default value
+		scaleNameStat.Parent = statsFolder
+		print("Created ScaleName stat for " .. player.Name)
+	end
+
+	-- Get or create ScaleValue stat (NumberValue)
+	local scaleValueStat = Stat.Get(player, "ScaleValue")
+	if not scaleValueStat then
+		-- Find Stats folder path
+		local playerData = Stat.GetDataFolder(player)
+		local statsFolder = playerData:FindFirstChild("Stats")
+
+		-- Create ScaleValue stat
+		scaleValueStat = Instance.new("NumberValue")
+		scaleValueStat.Name = "ScaleValue"
+		scaleValueStat.Value = 1 -- Default value (normal scale)
+		scaleValueStat.Parent = statsFolder
+		print("Created ScaleValue stat for " .. player.Name)
+	end
+
+	return true
+end
+
 -- Scale a player's character to the specified scale
 function ScaleCharacter.SetScale(player, scale)
 	-- Handle context (client vs server)
@@ -192,17 +244,18 @@ function ScaleCharacter.SetScale(player, scale)
 
 	-- Store values using Stat module (only if scaling succeeded)
 	if IsServer then
-		-- Ensure the player is loaded
-		if Stat.WaitForLoad(player) then
-			-- Store the scale name and value
+		-- Ensure scale stats exist
+		if ensureScaleStatsExist(player) then
+			-- Update the values
 			local scaleNameStat = Stat.Get(player, "ScaleName")
 			local scaleValueStat = Stat.Get(player, "ScaleValue")
 
 			if scaleNameStat and scaleValueStat then
 				scaleNameStat.Value = presetName
 				scaleValueStat.Value = numericScale
+				print("Updated scale stats for " .. player.Name .. " to " .. presetName .. " (" .. numericScale .. ")")
 			else
-				warn("ScaleCharacter: Could not find ScaleName or ScaleValue stats for " .. player.Name)
+				warn("ScaleCharacter: Could not find ScaleName or ScaleValue stats for " .. player.Name .. " even after creation attempt")
 			end
 		end
 	end
@@ -217,7 +270,12 @@ function ScaleCharacter.GetScale(player)
 	local scaleName = "normal" -- Default scale name
 
 	-- First try to get from stats if we're on the server
-	if IsServer and player and player:IsA("Player") then
+	if player and player:IsA("Player") then
+		-- Ensure stats exist
+		if IsServer then
+			ensureScaleStatsExist(player)
+		end
+
 		-- Check if player data is loaded
 		if Stat.WaitForLoad(player) then
 			local scaleValueStat = Stat.Get(player, "ScaleValue")
@@ -257,3 +315,4 @@ end
 ScaleCharacter.Initialize()
 
 return ScaleCharacter
+-- /ReplicatedStorage/Modules/Core/ScaleCharacter.lua
