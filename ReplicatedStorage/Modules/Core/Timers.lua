@@ -12,8 +12,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local IsServer = RunService:IsServer()
 local IsClient = RunService:IsClient()
 
--- Import Stat module for persistence
+-- Import modules
 local Stat = require(ReplicatedStorage.Stat)
+local Utility = require(ReplicatedStorage.Modules.Core.Utility) -- Import Utility for DebugLog
+
+-- Debug settings
+local debugSystem = "Timers" -- System name for debug logs
 
 -- Timer data structures
 local timerRegistry = {} -- Main registry containing all timer objects by player and name
@@ -34,6 +38,8 @@ Timer.__index = Timer
 
 -- Initialize the timer module
 function Timers.Initialize()
+	Utility.DebugLog(debugSystem, "info", "Initializing Timer module")
+
 	if IsServer then
 		-- Create remote events folder if it doesn't exist
 		local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
@@ -41,6 +47,7 @@ function Timers.Initialize()
 			eventsFolder = Instance.new("Folder")
 			eventsFolder.Name = "Events"
 			eventsFolder.Parent = ReplicatedStorage
+			Utility.DebugLog(debugSystem, "info", "Created Events folder")
 		end
 
 		local coreFolder = eventsFolder:FindFirstChild("Core")
@@ -48,6 +55,7 @@ function Timers.Initialize()
 			coreFolder = Instance.new("Folder")
 			coreFolder.Name = "Core"
 			coreFolder.Parent = eventsFolder
+			Utility.DebugLog(debugSystem, "info", "Created Core folder")
 		end
 
 		-- Create update event (server to client)
@@ -56,6 +64,7 @@ function Timers.Initialize()
 			updateEvent = Instance.new("RemoteEvent")
 			updateEvent.Name = "TimerUpdate"
 			updateEvent.Parent = coreFolder
+			Utility.DebugLog(debugSystem, "info", "Created TimerUpdate RemoteEvent")
 		end
 
 		-- Create command event (client to server)
@@ -64,10 +73,12 @@ function Timers.Initialize()
 			commandEvent = Instance.new("RemoteEvent")
 			commandEvent.Name = "TimerCommand"
 			commandEvent.Parent = coreFolder
+			Utility.DebugLog(debugSystem, "info", "Created TimerCommand RemoteEvent")
 		end
 
 		-- Listen for timer commands from clients
 		commandEvent.OnServerEvent:Connect(function(player, command, timerName, ...)
+			Utility.DebugLog(debugSystem, "info", "Received command: " .. command .. " for timer: " .. timerName .. " from player: " .. player.Name)
 			if command == "cancel" then
 				Timers.CancelTimer(player, timerName)
 			end
@@ -77,27 +88,39 @@ function Timers.Initialize()
 		Players.PlayerRemoving:Connect(function(player)
 			-- Save all timers for the player when they leave
 			-- This preserves exact time remaining for each timer
+			Utility.DebugLog(debugSystem, "info", "Player " .. player.Name .. " leaving - saving all timers")
 			Timers.SaveAllPlayerTimers(player)
-			print("Player " .. player.Name .. " leaving - all timers saved with current time remaining")
 		end)
 
 		Players.PlayerAdded:Connect(function(player)
 			-- Load timers when player joins
 			-- This will automatically resume them from where they left off
+			Utility.DebugLog(debugSystem, "info", "Player " .. player.Name .. " joined - loading timers")
 			Timers.LoadPlayerTimers(player)
-			print("Player " .. player.Name .. " joined - timers loaded and resumed from previous time")
 		end)
 	else
 		-- Client initialization
 		-- Wait for remote events to be created
+		Utility.DebugLog(debugSystem, "info", "Initializing client-side timers")
 		local eventsFolder = ReplicatedStorage:WaitForChild("Events", 10)
-		if not eventsFolder then return false end
+		if not eventsFolder then 
+			Utility.DebugLog(debugSystem, "warn", "Failed to find Events folder")
+			return false 
+		end
 
 		local coreFolder = eventsFolder:WaitForChild("Core", 10)
-		if not coreFolder then return false end
+		if not coreFolder then 
+			Utility.DebugLog(debugSystem, "warn", "Failed to find Core folder")
+			return false 
+		end
 
 		updateEvent = coreFolder:WaitForChild("TimerUpdate", 10)
 		commandEvent = coreFolder:WaitForChild("TimerCommand", 10)
+
+		if not updateEvent or not commandEvent then
+			Utility.DebugLog(debugSystem, "warn", "Failed to find timer remote events")
+			return false
+		end
 
 		-- Listen for timer updates from the server
 		updateEvent.OnClientEvent:Connect(function(timerName, timeRemaining, isComplete)
@@ -113,6 +136,7 @@ function Timers.Initialize()
 
 				if isComplete and not timer.isComplete then
 					timer.isComplete = true
+					Utility.DebugLog(debugSystem, "info", "Timer completed: " .. simpleName)
 					if timer.callbacks.onComplete then
 						task.spawn(timer.callbacks.onComplete, timer)
 					end
@@ -123,6 +147,7 @@ function Timers.Initialize()
 
 	-- Start the timer update loop
 	Timers.StartUpdateLoop()
+	Utility.DebugLog(debugSystem, "info", "Timer module initialized")
 
 	return true
 end
@@ -130,17 +155,17 @@ end
 -- Create a new timer
 function Timers.CreateTimer(player, name, duration, callbacks)
 	if type(player) ~= "userdata" or not player:IsA("Player") then
-		warn("Timers: Invalid player object provided to CreateTimer")
+		Utility.DebugLog(debugSystem, "warn", "Invalid player object provided to CreateTimer")
 		return nil
 	end
 
 	if type(name) ~= "string" or name == "" then
-		warn("Timers: Invalid timer name provided to CreateTimer")
+		Utility.DebugLog(debugSystem, "warn", "Invalid timer name provided to CreateTimer")
 		return nil
 	end
 
 	if type(duration) ~= "number" or duration <= 0 then
-		warn("Timers: Invalid duration provided to CreateTimer")
+		Utility.DebugLog(debugSystem, "warn", "Invalid duration provided to CreateTimer: " .. tostring(duration))
 		return nil
 	end
 
@@ -151,7 +176,7 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 
 	-- Check if timer already exists
 	if Timers.TimerExists(player, name) then
-		warn("Timers: Timer with name '" .. name .. "' already exists for player " .. player.Name)
+		Utility.DebugLog(debugSystem, "warn", "Timer with name '" .. name .. "' already exists for player " .. player.Name)
 		return Timers.GetTimer(player, name)
 	end
 
@@ -185,6 +210,8 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 	-- Add timer to registry
 	timerRegistry[player.UserId][name] = timer
 	activeTimersCount = activeTimersCount + 1
+	Utility.DebugLog(debugSystem, "info", "Created timer: " .. name .. " for player: " .. player.Name .. 
+		" with duration: " .. duration .. "s")
 
 	-- Save timer to player data
 	if IsServer then
@@ -226,7 +253,10 @@ end
 -- Cancel a timer
 function Timers.CancelTimer(player, name)
 	local timer = Timers.GetTimer(player, name)
-	if not timer then return false end
+	if not timer then 
+		Utility.DebugLog(debugSystem, "warn", "Attempted to cancel non-existent timer: " .. name .. " for player: " .. player.Name)
+		return false 
+	end
 
 	-- Call the onCancel callback if provided
 	if timer.callbacks.onCancel then
@@ -237,6 +267,7 @@ function Timers.CancelTimer(player, name)
 	if timerRegistry[player.UserId] then
 		timerRegistry[player.UserId][name] = nil
 		activeTimersCount = activeTimersCount - 1
+		Utility.DebugLog(debugSystem, "info", "Canceled timer: " .. name .. " for player: " .. player.Name)
 
 		-- Clean up if this was the last timer for the player
 		if not next(timerRegistry[player.UserId]) then
@@ -262,6 +293,7 @@ function Timers.CompleteTimer(player, name)
 
 	timer.isComplete = true
 	timer.timeRemaining = 0
+	Utility.DebugLog(debugSystem, "info", "Completed timer: " .. name .. " for player: " .. player.Name)
 
 	-- Call the onComplete callback if provided
 	if timer.callbacks.onComplete then
@@ -272,10 +304,12 @@ function Timers.CompleteTimer(player, name)
 	if timerRegistry[player.UserId] then
 		timerRegistry[player.UserId][name] = nil
 		activeTimersCount = activeTimersCount - 1
+		Utility.DebugLog(debugSystem, "info", "Removed completed timer: " .. name .. " from registry (Total active timers: " .. activeTimersCount .. ")")
 
 		-- Clean up if this was the last timer for the player
 		if not next(timerRegistry[player.UserId]) then
 			timerRegistry[player.UserId] = nil
+			Utility.DebugLog(debugSystem, "info", "Removed empty timer registry for player: " .. player.Name)
 		end
 	end
 
@@ -298,6 +332,7 @@ local function updateTimer(timer, deltaTime)
 	-- Check for halfway point
 	if not timer.isHalfwayReached and timer.timeRemaining <= timer.duration / 2 then
 		timer.isHalfwayReached = true
+		Utility.DebugLog(debugSystem, "info", "Timer " .. timer.simpleName .. " reached halfway point")
 		if timer.callbacks.onHalfway then
 			task.spawn(timer.callbacks.onHalfway, timer)
 		end
@@ -306,6 +341,7 @@ local function updateTimer(timer, deltaTime)
 	-- Check for low time
 	if not timer.isLowTimeReached and timer.timeRemaining <= timer.lowTimeThreshold then
 		timer.isLowTimeReached = true
+		Utility.DebugLog(debugSystem, "info", "Timer " .. timer.simpleName .. " reached low time threshold")
 		if timer.callbacks.onLowTime then
 			task.spawn(timer.callbacks.onLowTime, timer)
 		end
@@ -319,6 +355,7 @@ local function updateTimer(timer, deltaTime)
 	-- Check for completion
 	if timer.timeRemaining <= 0 and not timer.isComplete then
 		timer.isComplete = true
+		Utility.DebugLog(debugSystem, "info", "Timer " .. timer.simpleName .. " completed")
 
 		-- Call the onComplete callback
 		if timer.callbacks.onComplete then
@@ -334,9 +371,13 @@ end
 -- Main timer update loop
 function Timers.StartUpdateLoop()
 	-- Only start the update loop once
-	if Timers._updateConnection then return end
+	if Timers._updateConnection then 
+		Utility.DebugLog(debugSystem, "warn", "Attempted to start update loop when it's already running")
+		return 
+	end
 
 	local lastUpdateTime = os.time()
+	Utility.DebugLog(debugSystem, "info", "Starting timer update loop")
 
 	Timers._updateConnection = RunService.Heartbeat:Connect(function()
 		-- Skip update if no active timers
@@ -389,10 +430,12 @@ function Timers.StartUpdateLoop()
 				if isCompleted then
 					playerTimers[timerName] = nil
 					activeTimersCount = activeTimersCount - 1
+					Utility.DebugLog(debugSystem, "info", "Removed completed timer: " .. timerName .. " (Total active timers: " .. activeTimersCount .. ")")
 
 					-- If this was the last timer for the player, clean up
 					if not next(playerTimers) then
 						timerRegistry[playerId] = nil
+						Utility.DebugLog(debugSystem, "info", "Removed empty timer registry for player ID: " .. playerId)
 					end
 
 					-- Remove from player data
@@ -411,18 +454,21 @@ end
 -- Save timer data to player stats (persistence)
 function Timers.SaveTimer(player, name, timer)
 	if not IsServer then return end
-	if not player or not timer then return end
+	if not player or not timer then
+		Utility.DebugLog(debugSystem, "warn", "Attempted to save timer with invalid player or timer")
+		return false
+	end
 
 	-- Ensure player data is loaded
 	if not Stat.WaitForLoad(player) then
-		warn("Timers: Failed to save timer - player data not loaded")
+		Utility.DebugLog(debugSystem, "warn", "Failed to save timer - player data not loaded")
 		return false
 	end
 
 	-- Get player data folder
 	local playerData = Stat.GetDataFolder(player)
 	if not playerData then
-		warn("Timers: Failed to save timer - player data folder not found")
+		Utility.DebugLog(debugSystem, "warn", "Failed to save timer - player data folder not found")
 		return false
 	end
 
@@ -453,10 +499,6 @@ function Timers.SaveTimer(player, name, timer)
 		valueObj.Value = value
 	end
 
-	-- Log the timer save (for debugging)
-	print("Saving timer '" .. name .. "' for " .. player.Name .. 
-		" with " .. timer.timeRemaining .. " seconds remaining")
-
 	-- Save basic timer properties - only keep what we need
 	setOrCreateValue("Duration", "NumberValue", timer.duration)
 	setOrCreateValue("TimeRemaining", "NumberValue", timer.timeRemaining)
@@ -465,13 +507,64 @@ function Timers.SaveTimer(player, name, timer)
 	setOrCreateValue("IsLowTimeReached", "BoolValue", timer.isLowTimeReached)
 	setOrCreateValue("LowTimeThreshold", "NumberValue", timer.lowTimeThreshold)
 
+	-- No logging for routine saves
 	return true
+end
+
+-- Helper function for updating a timer
+local function updateTimer(timer, deltaTime)
+	if timer.isComplete then return false end
+
+	-- Update the timer
+	local previousTimeRemaining = timer.timeRemaining
+	timer.timeRemaining = math.max(0, timer.timeRemaining - deltaTime)
+
+	-- Check for halfway point
+	if not timer.isHalfwayReached and timer.timeRemaining <= timer.duration / 2 then
+		timer.isHalfwayReached = true
+		Utility.DebugLog(debugSystem, "info", "Timer " .. timer.simpleName .. " reached halfway point")
+		if timer.callbacks.onHalfway then
+			task.spawn(timer.callbacks.onHalfway, timer)
+		end
+	end
+
+	-- Check for low time
+	if not timer.isLowTimeReached and timer.timeRemaining <= timer.lowTimeThreshold then
+		timer.isLowTimeReached = true
+		Utility.DebugLog(debugSystem, "info", "Timer " .. timer.simpleName .. " reached low time threshold")
+		if timer.callbacks.onLowTime then
+			task.spawn(timer.callbacks.onLowTime, timer)
+		end
+	end
+
+	-- Only call tick if time actually changed (by at least 0.1 second to avoid excessive callbacks)
+	if math.abs(previousTimeRemaining - timer.timeRemaining) >= 0.1 and timer.callbacks.onTick then
+		task.spawn(timer.callbacks.onTick, timer)
+	end
+
+	-- Check for completion
+	if timer.timeRemaining <= 0 and not timer.isComplete then
+		timer.isComplete = true
+		Utility.DebugLog(debugSystem, "info", "Timer " .. timer.simpleName .. " completed")
+
+		-- Call the onComplete callback
+		if timer.callbacks.onComplete then
+			task.spawn(timer.callbacks.onComplete, timer)
+		end
+
+		return true -- Timer completed
+	end
+
+	return false -- Timer still active
 end
 
 -- Remove timer data from player stats
 function Timers.RemoveTimer(player, name)
 	if not IsServer then return end
-	if not player then return end
+	if not player then
+		Utility.DebugLog(debugSystem, "warn", "Attempted to remove timer with invalid player")
+		return false
+	end
 
 	-- Ensure player data is loaded
 	if not Stat.WaitForLoad(player) then return false end
@@ -497,33 +590,57 @@ end
 -- Save all timers for a player (typically when they leave)
 function Timers.SaveAllPlayerTimers(player)
 	if not IsServer then return end
-	if not player or not player.UserId then return end
+	if not player or not player.UserId then
+		Utility.DebugLog(debugSystem, "warn", "Attempted to save all timers with invalid player")
+		return
+	end
 
 	local playerTimers = timerRegistry[player.UserId]
-	if not playerTimers then return end
+	if not playerTimers then
+		return
+	end
 
+	local timerCount = 0
 	for timerName, timer in pairs(playerTimers) do
 		Timers.SaveTimer(player, timerName, timer)
+		timerCount = timerCount + 1
+	end
+
+	if timerCount > 0 then
+		Utility.DebugLog(debugSystem, "info", "Saved " .. timerCount .. " timers for player: " .. player.Name)
 	end
 end
 
 -- Load timers for a player (typically when they join)
 function Timers.LoadPlayerTimers(player)
 	if not IsServer then return end
-	if not player then return end
+	if not player then
+		Utility.DebugLog(debugSystem, "warn", "Attempted to load timers with invalid player")
+		return
+	end
 
 	-- Ensure player data is loaded
-	if not Stat.WaitForLoad(player) then return end
+	if not Stat.WaitForLoad(player) then
+		Utility.DebugLog(debugSystem, "warn", "Failed to load timers - player data not loaded")
+		return
+	end
 
 	-- Get player data folder
 	local playerData = Stat.GetDataFolder(player)
-	if not playerData then return end
+	if not playerData then
+		Utility.DebugLog(debugSystem, "warn", "Failed to load timers - player data folder not found")
+		return
+	end
 
 	-- Get Timers folder
 	local timersFolder = playerData:FindFirstChild("Timers")
-	if not timersFolder then return end
+	if not timersFolder then
+		-- No timers to load, this is normal for new players
+		return
+	end
 
 	-- Load all timers
+	local loadedCount = 0
 	for _, timerFolder in ipairs(timersFolder:GetChildren()) do
 		if timerFolder:IsA("Folder") then
 			local timerName = timerFolder.Name
@@ -553,12 +670,6 @@ function Timers.LoadPlayerTimers(player)
 			local isLowTimeReached = getValue("IsLowTimeReached", false)
 			local lowTimeThreshold = getValue("LowTimeThreshold", duration * LOW_TIME_THRESHOLD)
 
-			-- Important: Use the exact timeRemaining value that was saved
-			-- We don't adjust time based on how long player was offline
-
-			print("Loading timer '" .. timerName .. "' for " .. player.Name .. 
-				" with " .. timeRemaining .. " seconds remaining")
-
 			-- Create timer in memory
 			local timer = setmetatable({
 				name = player.UserId .. "_" .. timerName,
@@ -582,36 +693,70 @@ function Timers.LoadPlayerTimers(player)
 			-- Add timer to registry
 			timerRegistry[player.UserId][timerName] = timer
 			activeTimersCount = activeTimersCount + 1
+			loadedCount = loadedCount + 1
 
 			-- Update the timer data
 			Timers.SaveTimer(player, timerName, timer)
 		end
 	end
+
+	if loadedCount > 0 then
+		Utility.DebugLog(debugSystem, "info", "Loaded " .. loadedCount .. " timers for player: " .. player.Name)
+	end
 end
 
--- Get information about all timers for a player
-function Timers.GetAllTimers(player)
-	if not player or not player.UserId then return {} end
-	if not timerRegistry[player.UserId] then return {} end
-
-	local result = {}
-	for name, timer in pairs(timerRegistry[player.UserId]) do
-		result[name] = {
-			duration = timer.duration,
-			timeRemaining = timer.timeRemaining,
-			isComplete = timer.isComplete
-		}
+-- Function to get all active timers for all players
+-- @return (table) - Table containing all timers organized by player UserID and timer name
+function Timers.GetAllPlayersTimers()
+	-- Only allow this function on the server
+	if not IsServer then 
+		Utility.DebugLog(debugSystem, "warn", "GetAllPlayersTimers can only be called from server code")
+		return {} 
 	end
 
+	-- Return a deep copy of the timer registry to prevent external modification
+	local result = {}
+	local playerCount = 0
+
+	for userId, playerTimers in pairs(timerRegistry) do
+		result[userId] = {}
+		playerCount = playerCount + 1
+
+		for timerName, timer in pairs(playerTimers) do
+			-- Include only essential information to avoid exposing internal details
+			result[userId][timerName] = {
+				duration = timer.duration,
+				timeRemaining = timer.timeRemaining,
+				isComplete = timer.isComplete,
+				playerId = timer.playerId,
+				simpleName = timer.simpleName,
+				-- Include additional timer metadata as needed
+				isHalfwayReached = timer.isHalfwayReached,
+				isLowTimeReached = timer.isLowTimeReached
+			}
+		end
+	end
+
+	Utility.DebugLog(debugSystem, "info", "GetAllPlayersTimers called - returning " .. playerCount .. " player entries")
 	return result
 end
 
 -- Get debugging information
 function Timers.GetDebugInfo()
-	return {
+	local playerCount = 0
+	for _ in pairs(timerRegistry) do
+		playerCount = playerCount + 1
+	end
+
+	local info = {
 		activeTimersCount = activeTimersCount,
-		playerCount = #table.keys(timerRegistry)
+		playerCount = playerCount
 	}
+
+	Utility.DebugLog(debugSystem, "info", "GetDebugInfo called - " .. info.activeTimersCount .. 
+		" active timers across " .. info.playerCount .. " players")
+
+	return info
 end
 
 -- Initialize the module

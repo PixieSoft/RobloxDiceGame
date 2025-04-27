@@ -46,4 +46,37 @@ function Utility.FormatTimeDuration(seconds)
 	return table.concat(parts, " ")
 end
 
+-- Debug logging function that checks if a system's debug flag is enabled before logging
+-- @param System (string) - The system name to check in ReplicatedStorage/Debug
+-- @param Severity (string) - The severity level: "info", "warn", or "err"
+-- @param Text (string) - The message to output
+function Utility.DebugLog(System, Severity, Text)
+	-- Get a reference to the Debug folder
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local DebugFolder = ReplicatedStorage:FindFirstChild("Debug")
+
+	-- If the Debug folder doesn't exist, do nothing
+	if not DebugFolder then
+		return
+	end
+
+	-- Check if the system's debug flag exists and is enabled
+	local SystemFlag = DebugFolder:FindFirstChild(System)
+	if not SystemFlag or not SystemFlag:IsA("BoolValue") or not SystemFlag.Value then
+		return
+	end
+
+	-- Output the message based on severity
+	if Severity == "info" then
+		print("[" .. System .. "] " .. Text)
+	elseif Severity == "warn" then
+		warn("[" .. System .. "] " .. Text)
+	elseif Severity == "err" then
+		error("[" .. System .. "] " .. Text)
+	else
+		-- Default to info if severity is not recognized
+		print("[" .. System .. "] " .. Text .. " (Unknown severity: " .. Severity .. ")")
+	end
+end
+
 return Utility
