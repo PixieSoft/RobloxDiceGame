@@ -50,7 +50,7 @@ end
 -- @param System (string) - The system name to check in ReplicatedStorage/Debug
 -- @param Severity (string) - The severity level: "info", "warn", or "err"
 -- @param Text (string) - The message to output
-function Utility.DebugLog(System, Severity, Text)
+function Utility.Log(System, Severity, Text)
 	-- Get a reference to the Debug folder
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local DebugFolder = ReplicatedStorage:FindFirstChild("Debug")

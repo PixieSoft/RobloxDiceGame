@@ -8,10 +8,14 @@ local IsServer = RunService:IsServer()
 -- Import modules
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 local Stat = require(ReplicatedStorage.Stat)
-local Timers = require(ReplicatedStorage.Modules.Core.Timers)
+-- Defer loading Timers to break circular dependency
+local Timers = nil
 
 -- Create a table that we can reference from within its own methods
 local CrystalBooster = {}
+
+-- Debug settings
+local debugSystem = "Boosters" -- System name for debug logs
 
 -- Define properties
 CrystalBooster.name = "Crystals"
@@ -41,7 +45,7 @@ local function ensureStats(player)
 
 	-- Wait for player data to load
 	if not Stat.WaitForLoad(player) then
-		warn("Crystal Booster: Failed to wait for player data to load")
+		Utility.Log(debugSystem, "warn", "Failed to wait for player data to load")
 		return false
 	end
 
@@ -64,7 +68,7 @@ local function ensureStats(player)
 		crystalsActiveStat.Name = "CrystalsActive"
 		crystalsActiveStat.Value = false
 		crystalsActiveStat.Parent = boostersFolder
-		print("Created CrystalsActive stat for " .. player.Name)
+		Utility.Log(debugSystem, "info", "Created CrystalsActive stat for " .. player.Name)
 	end
 
 	return true
@@ -75,9 +79,14 @@ CrystalBooster.onActivate = function(player, qty)
 	-- This function only runs on the server
 	if not IsServer then return function() end end
 
+	-- Load Timers module when needed (to avoid circular dependency)
+	if not Timers then
+		Timers = require(ReplicatedStorage.Modules.Core.Timers)
+	end
+
 	-- Ensure stats exist
 	if not ensureStats(player) then
-		warn("Crystal Booster: Failed to ensure stats for " .. player.Name)
+		Utility.Log(debugSystem, "warn", "Failed to ensure stats for " .. player.Name)
 		return function() end
 	end
 
@@ -92,19 +101,16 @@ CrystalBooster.onActivate = function(player, qty)
 	-- Set the crystal active status
 	crystalsActiveStat.Value = true
 
-	print("Crystal booster activated for " .. player.Name .. ": Active for " .. totalDuration .. " seconds")
+	Utility.Log(debugSystem, "info", "Crystal booster activated for " .. player.Name .. ": Active for " .. totalDuration .. " seconds")
 
 	-- Create a timer with callbacks using the Timers module
-	local timerName = "CrystalsEffect"
+	local timerName = "Crystals"
 
 	-- Define callbacks for the timer
 	local callbacks = {
 		onTick = function(timer)
-			-- Update any visual effects or other systems on each tick
-			-- Debug output to confirm timer is ticking
-			if timer.timeRemaining % 1 < 0.1 then -- Only print on whole seconds approximately
-				print("Crystal effect: " .. math.floor(timer.timeRemaining) .. " seconds remaining for " .. player.Name)
-			end
+			-- The timer module will handle its own ticking debug messages
+			-- We only need to add custom logic here if needed
 		end,
 
 		onComplete = function(timer)
@@ -112,15 +118,15 @@ CrystalBooster.onActivate = function(player, qty)
 			if crystalsActiveStat then
 				crystalsActiveStat.Value = false
 			end
-			print("Crystal effect expired for " .. player.Name)
+			Utility.Log(debugSystem, "info", "Crystal effect expired for " .. player.Name)
 		end,
 
 		onPause = function(timer)
-			print("Crystal effect paused for " .. player.Name .. " with " .. math.floor(timer.timeRemaining) .. " seconds remaining")
+			Utility.Log(debugSystem, "info", "Crystal effect paused for " .. player.Name .. " with " .. math.floor(timer.timeRemaining) .. " seconds remaining")
 		end,
 
 		onResume = function(timer)
-			print("Crystal effect resumed for " .. player.Name .. " with " .. math.floor(timer.timeRemaining) .. " seconds remaining")
+			Utility.Log(debugSystem, "info", "Crystal effect resumed for " .. player.Name .. " with " .. math.floor(timer.timeRemaining) .. " seconds remaining")
 		end,
 
 		onCancel = function(timer)
@@ -128,19 +134,19 @@ CrystalBooster.onActivate = function(player, qty)
 			if crystalsActiveStat then
 				crystalsActiveStat.Value = false
 			end
-			print("Crystal effect canceled for " .. player.Name)
+			Utility.Log(debugSystem, "info", "Crystal effect canceled for " .. player.Name)
 		end,
 
 		onHalfway = function(timer)
-			print("Crystal effect halfway point reached for " .. player.Name)
+			Utility.Log(debugSystem, "info", "Crystal effect halfway point reached for " .. player.Name)
 		end,
 
 		onLowTime = function(timer)
-			print("Crystal effect almost expired for " .. player.Name .. " (Low time warning)")
+			Utility.Log(debugSystem, "info", "Crystal effect almost expired for " .. player.Name)
 		end,
 
 		onStart = function(timer)
-			print("Crystal effect started for " .. player.Name .. " with duration of " .. timer.duration .. " seconds")
+			Utility.Log(debugSystem, "info", "Crystal effect started for " .. player.Name .. " with duration of " .. timer.duration .. " seconds")
 		end,
 
 		-- Set low time threshold to 2 seconds
@@ -151,12 +157,17 @@ CrystalBooster.onActivate = function(player, qty)
 	local timer = Timers.CreateTimer(player, timerName, totalDuration, callbacks)
 
 	if not timer then
-		warn("Crystal Booster: Failed to create timer for " .. player.Name)
+		Utility.Log(debugSystem, "warn", "Failed to create timer for " .. player.Name)
 		return function() end
 	end
 
 	-- Return cleanup function that will run when the booster expires or is canceled
 	return function()
+		-- Make sure Timers is loaded
+		if not Timers then
+			Timers = require(ReplicatedStorage.Modules.Core.Timers)
+		end
+
 		-- Cancel the timer if it's still active
 		if Timers.TimerExists(player, timerName) then
 			Timers.CancelTimer(player, timerName)
@@ -167,8 +178,9 @@ CrystalBooster.onActivate = function(player, qty)
 			crystalsActiveStat.Value = false
 		end
 
-		print("Crystal booster cleanup function called for " .. player.Name)
+		Utility.Log(debugSystem, "info", "Crystal booster cleanup function called for " .. player.Name)
 	end
 end
 
 return CrystalBooster
+-- /ReplicatedStorage/Modules/Core/BoosterDefs/Crystals.lua
