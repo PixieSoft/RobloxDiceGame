@@ -1,5 +1,5 @@
--- /StarterGui/Scripts/HUD/JumpSpeedMass.lua
--- LocalScript that creates a dynamic GUI for viewing and modifying character stats
+-- /StarterGui/Scripts/HUD/PhysicsInfo.lua
+-- LocalScript that creates a dynamic GUI for viewing and modifying character physics properties
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -34,7 +34,7 @@ titleLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 titleLabel.BackgroundTransparency = 0.2
 titleLabel.BorderSizePixel = 0
 titleLabel.Font = Enum.Font.GothamBold
-titleLabel.Text = "Character Stats"
+titleLabel.Text = "Physics"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 14
 titleLabel.Parent = statsFrame
@@ -94,7 +94,7 @@ local statConfigs = {
 		displayName = "Speed",
 		default = 16,
 		min = 1,
-		max = 100,
+		max = 10000,
 		editable = true
 	},
 	{
@@ -102,7 +102,7 @@ local statConfigs = {
 		displayName = "Height",
 		default = 7.2,
 		min = 0,
-		max = 50,
+		max = 10000,
 		editable = true
 	},
 	{
@@ -110,7 +110,7 @@ local statConfigs = {
 		displayName = "Power",
 		default = 50,
 		min = 0,
-		max = 250,
+		max = 10000,
 		editable = true
 	},
 	{
@@ -118,7 +118,7 @@ local statConfigs = {
 		displayName = "Mass",
 		default = 1,
 		min = 0.1,
-		max = 100,
+		max = 10000,
 		editable = false
 	},
 	{
@@ -126,7 +126,7 @@ local statConfigs = {
 		displayName = "Density",
 		default = 1,
 		min = 0.1,
-		max = 1000,
+		max = 10000,
 		editable = false
 	}
 }
@@ -152,7 +152,7 @@ for i, config in ipairs(statConfigs) do
 	-- Label for stat name
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Name = "NameLabel"
-	nameLabel.Size = UDim2.new(0.25, 0, 1, 0)
+	nameLabel.Size = UDim2.new(0.3, 0, 1, 0) -- Increased size for more spacing
 	nameLabel.Position = UDim2.new(0, 0, 0, 0)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Font = Enum.Font.Gotham
@@ -166,8 +166,8 @@ for i, config in ipairs(statConfigs) do
 	-- Display current value
 	local valueLabel = Instance.new("TextLabel")
 	valueLabel.Name = "ValueLabel"
-	valueLabel.Size = UDim2.new(0.15, 0, 1, 0)
-	valueLabel.Position = UDim2.new(0.25, 0, 0, 0)
+	valueLabel.Size = UDim2.new(0.2, 0, 1, 0) -- Increased size for more spacing
+	valueLabel.Position = UDim2.new(0.3, 0, 0, 0)
 	valueLabel.BackgroundTransparency = 1
 	valueLabel.Font = Enum.Font.Gotham
 	valueLabel.Text = tostring(config.default)
@@ -177,13 +177,13 @@ for i, config in ipairs(statConfigs) do
 	valueLabel.TextYAlignment = Enum.TextYAlignment.Center
 	valueLabel.Parent = row
 
-	-- Only add input box and save button if the stat is editable
+	-- Only add input box for editable stats
 	if config.editable then
 		-- Input box for new value
 		local inputBox = Instance.new("TextBox")
 		inputBox.Name = "InputBox"
-		inputBox.Size = UDim2.new(0.20, 0, 0.6, 0)
-		inputBox.Position = UDim2.new(0.40, 5, 0.2, 0)
+		inputBox.Size = UDim2.new(0.25, 0, 0.6, 0)
+		inputBox.Position = UDim2.new(0.75, -10, 0.2, 0) -- Right-justified
 		inputBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 		inputBox.BackgroundTransparency = 0.5
 		inputBox.BorderSizePixel = 0
@@ -194,87 +194,69 @@ for i, config in ipairs(statConfigs) do
 		inputBox.TextSize = 12
 		inputBox.ClearTextOnFocus = true
 		inputBox.Parent = row
+		inputBox.TextXAlignment = Enum.TextXAlignment.Right -- Right-align text
 
 		-- Add rounded corners to input box
 		local boxCorner = Instance.new("UICorner")
 		boxCorner.CornerRadius = UDim.new(0, 4)
 		boxCorner.Parent = inputBox
 
-		-- Save button
-		local saveButton = Instance.new("TextButton")
-		saveButton.Name = "SaveButton"
-		saveButton.Size = UDim2.new(0.15, -10, 0.6, 0)
-		saveButton.Position = UDim2.new(0.85, 0, 0.2, 0)
-		saveButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
-		saveButton.BackgroundTransparency = 0.3
-		saveButton.BorderSizePixel = 0
-		saveButton.Font = Enum.Font.GothamBold
-		saveButton.Text = "Save"
-		saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		saveButton.TextSize = 12
-		saveButton.AutoButtonColor = true
-		saveButton.Parent = row
-
-		-- Add rounded corners to save button
-		local buttonCorner = Instance.new("UICorner")
-		buttonCorner.CornerRadius = UDim.new(0, 4)
-		buttonCorner.Parent = saveButton
-
 		-- Store references to update later
 		statRows[config.name] = {
 			valueLabel = valueLabel,
 			inputBox = inputBox,
-			saveButton = saveButton,
 			config = config
 		}
 
-		-- Handle save button click
-		saveButton.MouseButton1Click:Connect(function()
-			local success, value = pcall(function()
-				return tonumber(inputBox.Text)
-			end)
+		-- Handle input box focus lost and enter key press
+		inputBox.FocusLost:Connect(function(enterPressed)
+			if enterPressed then -- Only process if Enter was pressed
+				local success, value = pcall(function()
+					return tonumber(inputBox.Text)
+				end)
 
-			if success and value then
-				-- Check bounds
-				value = math.clamp(value, config.min, config.max)
+				if success and value then
+					-- Check bounds
+					value = math.clamp(value, config.min, config.max)
 
-				-- Apply new value to character
-				local character = player.Character
-				if character then
-					-- Regular humanoid property
-					local humanoid = character:FindFirstChildOfClass("Humanoid")
-					if humanoid then
-						humanoid[config.name] = value
+					-- Apply new value to character
+					local character = player.Character
+					if character then
+						-- Regular humanoid property
+						local humanoid = character:FindFirstChildOfClass("Humanoid")
+						if humanoid then
+							humanoid[config.name] = value
+						end
 					end
+
+					-- Clear input box
+					inputBox.Text = ""
+
+					-- Flash the input box to indicate success
+					local originalColor = inputBox.BackgroundColor3
+					inputBox.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+
+					-- Create tween to return to original color
+					local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+					local tween = TweenService:Create(inputBox, tweenInfo, {
+						BackgroundColor3 = originalColor
+					})
+					tween:Play()
+				else
+					-- Flash the input box to indicate error
+					local originalColor = inputBox.BackgroundColor3
+					inputBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+
+					-- Create tween to return to original color
+					local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+					local tween = TweenService:Create(inputBox, tweenInfo, {
+						BackgroundColor3 = originalColor
+					})
+					tween:Play()
+
+					-- Clear input box
+					inputBox.Text = ""
 				end
-
-				-- Clear input box
-				inputBox.Text = ""
-
-				-- Flash the button green to indicate success
-				local originalColor = saveButton.BackgroundColor3
-				saveButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-
-				-- Create tween to return to original color
-				local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-				local tween = TweenService:Create(saveButton, tweenInfo, {
-					BackgroundColor3 = originalColor
-				})
-				tween:Play()
-			else
-				-- Flash the button red to indicate error
-				local originalColor = saveButton.BackgroundColor3
-				saveButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-
-				-- Create tween to return to original color
-				local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-				local tween = TweenService:Create(saveButton, tweenInfo, {
-					BackgroundColor3 = originalColor
-				})
-				tween:Play()
-
-				-- Clear input box
-				inputBox.Text = ""
 			end
 		end)
 	else
@@ -288,7 +270,7 @@ for i, config in ipairs(statConfigs) do
 		local readOnlyLabel = Instance.new("TextLabel")
 		readOnlyLabel.Name = "ReadOnlyLabel"
 		readOnlyLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
-		readOnlyLabel.Position = UDim2.new(0.40, 5, 0.2, 0)
+		readOnlyLabel.Position = UDim2.new(0.65, -10, 0.2, 0) -- Right-justified
 		readOnlyLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 		readOnlyLabel.BackgroundTransparency = 0.7
 		readOnlyLabel.BorderSizePixel = 0
@@ -410,7 +392,7 @@ local function toggleVisibility()
 end
 
 -- Expose toggle function via _G for other scripts
-_G.ToggleStatsGUI = toggleVisibility
+_G.TogglePhysicsGUI = toggleVisibility
 
 -- Make GUI initially visible
 statsFrame.Visible = true
@@ -424,4 +406,5 @@ script.AncestryChanged:Connect(function(_, newParent)
 	end
 end)
 
-print("Character Stats GUI initialized with mass and density display")
+print("Physics Info GUI initialized with mass and density display")
+-- /StarterGui/Scripts/HUD/PhysicsInfo.lua
