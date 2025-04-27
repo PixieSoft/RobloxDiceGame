@@ -68,26 +68,24 @@ function Timers.Initialize()
 
 		-- Listen for timer commands from clients
 		commandEvent.OnServerEvent:Connect(function(player, command, timerName, ...)
-			local fullTimerName = player.UserId .. "_" .. timerName
-
-			if command == "pause" then
-				Timers.PauseTimer(player, timerName)
-			elseif command == "resume" then
-				Timers.ResumeTimer(player, timerName)
-			elseif command == "cancel" then
+			if command == "cancel" then
 				Timers.CancelTimer(player, timerName)
 			end
 		end)
 
 		-- Set up player joined/leaving handlers
 		Players.PlayerRemoving:Connect(function(player)
-			-- Save all active timers for the player
+			-- Save all timers for the player when they leave
+			-- This preserves exact time remaining for each timer
 			Timers.SaveAllPlayerTimers(player)
+			print("Player " .. player.Name .. " leaving - all timers saved with current time remaining")
 		end)
 
 		Players.PlayerAdded:Connect(function(player)
 			-- Load timers when player joins
+			-- This will automatically resume them from where they left off
 			Timers.LoadPlayerTimers(player)
+			print("Player " .. player.Name .. " joined - timers loaded and resumed from previous time")
 		end)
 	else
 		-- Client initialization
@@ -102,7 +100,7 @@ function Timers.Initialize()
 		commandEvent = coreFolder:WaitForChild("TimerCommand", 10)
 
 		-- Listen for timer updates from the server
-		updateEvent.OnClientEvent:Connect(function(timerName, timeRemaining, isPaused, isComplete)
+		updateEvent.OnClientEvent:Connect(function(timerName, timeRemaining, isComplete)
 			-- Update local timers based on server data
 			local localPlayer = Players.LocalPlayer
 			if not localPlayer then return end
@@ -112,7 +110,6 @@ function Timers.Initialize()
 
 			if timer then
 				timer.timeRemaining = timeRemaining
-				timer.isPaused = isPaused
 
 				if isComplete and not timer.isComplete then
 					timer.isComplete = true
@@ -165,9 +162,6 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 		playerId = player.UserId,
 		duration = duration,
 		timeRemaining = duration,
-		startTime = os.time(),
-		lastUpdateTime = os.time(),
-		isPaused = false,
 		isComplete = false,
 		isHalfwayReached = false,
 		isLowTimeReached = false,
@@ -175,8 +169,6 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 		callbacks = {
 			onTick = callbacks.onTick,
 			onComplete = callbacks.onComplete,
-			onPause = callbacks.onPause,
-			onResume = callbacks.onResume,
 			onCancel = callbacks.onCancel,
 			onHalfway = callbacks.onHalfway,
 			onLowTime = callbacks.onLowTime,
@@ -199,7 +191,11 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 		Timers.SaveTimer(player, name, timer)
 	end
 
-	-- We'll fire the onStart callback in the main update loop to ensure consistent ordering
+	-- Fire onStart callback immediately
+	if timer.callbacks.onStart then
+		task.spawn(timer.callbacks.onStart, timer)
+		timer.initialCallbacksFired = true
+	end
 
 	return timer
 end
@@ -225,53 +221,6 @@ function Timers.GetTimeRemaining(player, name)
 	if not timer then return 0 end
 
 	return timer.timeRemaining
-end
-
--- Pause a timer
-function Timers.PauseTimer(player, name)
-	local timer = Timers.GetTimer(player, name)
-	if not timer or timer.isPaused or timer.isComplete then return false end
-
-	timer.isPaused = true
-
-	-- Save the timer state to player data
-	if IsServer then
-		Timers.SaveTimer(player, name, timer)
-	elseif IsClient then
-		-- If we're on the client, send pause command to server
-		commandEvent:FireServer("pause", name)
-	end
-
-	-- Call the onPause callback if provided
-	if timer.callbacks.onPause then
-		task.spawn(timer.callbacks.onPause, timer)
-	end
-
-	return true
-end
-
--- Resume a timer
-function Timers.ResumeTimer(player, name)
-	local timer = Timers.GetTimer(player, name)
-	if not timer or not timer.isPaused or timer.isComplete then return false end
-
-	timer.isPaused = false
-	timer.lastUpdateTime = os.time()
-
-	-- Save the timer state to player data
-	if IsServer then
-		Timers.SaveTimer(player, name, timer)
-	elseif IsClient then
-		-- If we're on the client, send resume command to server
-		commandEvent:FireServer("resume", name)
-	end
-
-	-- Call the onResume callback if provided
-	if timer.callbacks.onResume then
-		task.spawn(timer.callbacks.onResume, timer)
-	end
-
-	return true
 end
 
 -- Cancel a timer
@@ -340,7 +289,7 @@ end
 
 -- Helper function for updating a timer
 local function updateTimer(timer, deltaTime)
-	if timer.isPaused or timer.isComplete then return false end
+	if timer.isComplete then return false end
 
 	-- Update the timer
 	local previousTimeRemaining = timer.timeRemaining
@@ -397,7 +346,7 @@ function Timers.StartUpdateLoop()
 		local currentTime = os.time()
 		local deltaTime = currentTime - lastUpdateTime
 
-		-- Only update if enough time has passed (at least 1 second)
+		-- Only update if enough time has passed
 		if deltaTime < 1 then return end
 
 		lastUpdateTime = currentTime
@@ -406,7 +355,7 @@ function Timers.StartUpdateLoop()
 		for playerId, playerTimers in pairs(timerRegistry) do
 			for timerName, timer in pairs(playerTimers) do
 				-- Skip updating if timer was just created (allow all callbacks to be set up first)
-				if os.time() - timer.startTime < 1 and not timer.initialCallbacksFired then
+				if not timer.initialCallbacksFired then
 					-- Fire onStart callback if not already fired
 					if timer.callbacks.onStart then
 						task.spawn(timer.callbacks.onStart, timer)
@@ -431,7 +380,6 @@ function Timers.StartUpdateLoop()
 							player, 
 							timer.name, 
 							timer.timeRemaining, 
-							timer.isPaused, 
 							timer.isComplete
 						)
 					end
@@ -505,12 +453,13 @@ function Timers.SaveTimer(player, name, timer)
 		valueObj.Value = value
 	end
 
-	-- Save basic timer properties
+	-- Log the timer save (for debugging)
+	print("Saving timer '" .. name .. "' for " .. player.Name .. 
+		" with " .. timer.timeRemaining .. " seconds remaining")
+
+	-- Save basic timer properties - only keep what we need
 	setOrCreateValue("Duration", "NumberValue", timer.duration)
 	setOrCreateValue("TimeRemaining", "NumberValue", timer.timeRemaining)
-	setOrCreateValue("StartTime", "NumberValue", timer.startTime)
-	setOrCreateValue("LastUpdateTime", "NumberValue", os.time())
-	setOrCreateValue("IsPaused", "BoolValue", timer.isPaused)
 	setOrCreateValue("IsComplete", "BoolValue", timer.isComplete)
 	setOrCreateValue("IsHalfwayReached", "BoolValue", timer.isHalfwayReached)
 	setOrCreateValue("IsLowTimeReached", "BoolValue", timer.isLowTimeReached)
@@ -591,7 +540,6 @@ function Timers.LoadPlayerTimers(player)
 			-- Get timer properties
 			local duration = getValue("Duration", 0)
 			local timeRemaining = getValue("TimeRemaining", 0)
-			local isPaused = getValue("IsPaused", false)
 			local isComplete = getValue("IsComplete", false)
 
 			-- If timer is already complete or has no time remaining, clean it up
@@ -605,21 +553,11 @@ function Timers.LoadPlayerTimers(player)
 			local isLowTimeReached = getValue("IsLowTimeReached", false)
 			local lowTimeThreshold = getValue("LowTimeThreshold", duration * LOW_TIME_THRESHOLD)
 
-			-- Calculate how long since this timer was last updated
-			local lastUpdateTime = getValue("LastUpdateTime", os.time())
-			local currentTime = os.time()
-			local timeSinceUpdate = currentTime - lastUpdateTime
+			-- Important: Use the exact timeRemaining value that was saved
+			-- We don't adjust time based on how long player was offline
 
-			-- Adjust time remaining if the timer wasn't paused
-			if not isPaused and timeSinceUpdate > 0 then
-				timeRemaining = math.max(0, timeRemaining - timeSinceUpdate)
-
-				-- If timer would have completed, clean it up
-				if timeRemaining <= 0 then
-					Timers.RemoveTimer(player, timerName)
-					continue
-				end
-			end
+			print("Loading timer '" .. timerName .. "' for " .. player.Name .. 
+				" with " .. timeRemaining .. " seconds remaining")
 
 			-- Create timer in memory
 			local timer = setmetatable({
@@ -627,15 +565,13 @@ function Timers.LoadPlayerTimers(player)
 				simpleName = timerName,
 				playerId = player.UserId,
 				duration = duration,
-				timeRemaining = timeRemaining,
-				startTime = getValue("StartTime", os.time() - (duration - timeRemaining)),
-				lastUpdateTime = currentTime,
-				isPaused = isPaused,
+				timeRemaining = timeRemaining, -- Use exact time that was saved
 				isComplete = isComplete,
 				isHalfwayReached = isHalfwayReached,
 				isLowTimeReached = isLowTimeReached,
 				lowTimeThreshold = lowTimeThreshold,
-				callbacks = {}
+				callbacks = {},
+				initialCallbacksFired = true -- Don't trigger onStart again for loaded timers
 			}, Timer)
 
 			-- Initialize player registry if needed
@@ -647,7 +583,7 @@ function Timers.LoadPlayerTimers(player)
 			timerRegistry[player.UserId][timerName] = timer
 			activeTimersCount = activeTimersCount + 1
 
-			-- Update the timer data with adjusted values
+			-- Update the timer data
 			Timers.SaveTimer(player, timerName, timer)
 		end
 	end
@@ -663,7 +599,6 @@ function Timers.GetAllTimers(player)
 		result[name] = {
 			duration = timer.duration,
 			timeRemaining = timer.timeRemaining,
-			isPaused = timer.isPaused,
 			isComplete = timer.isComplete
 		}
 	end
@@ -683,3 +618,4 @@ end
 Timers.Initialize()
 
 return Timers
+-- /ReplicatedStorage/Modules/Core/Timers.lua
