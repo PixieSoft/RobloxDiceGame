@@ -36,6 +36,29 @@ local LOW_TIME_THRESHOLD = 0.1 -- Default low time threshold (10% of total durat
 local Timer = {}
 Timer.__index = Timer
 
+-- Helper function to generate a consistent fully qualified timer name
+-- @param playerId (number) - The player's UserId
+-- @param timerName (string) - The simple timer name
+-- @return (string) - The fully qualified timer name
+function Timers.GetFullTimerName(playerId, timerName)
+	return playerId .. "_" .. timerName
+end
+
+-- Helper function to extract player ID and simple name from a fully qualified timer name
+-- @param fullTimerName (string) - The fully qualified timer name
+-- @return (number, string) - The player ID and simple timer name
+function Timers.ParseFullTimerName(fullTimerName)
+	local underscoreIndex = string.find(fullTimerName, "_")
+	if not underscoreIndex then
+		return nil, fullTimerName -- Not a valid full timer name
+	end
+
+	local playerIdStr = string.sub(fullTimerName, 1, underscoreIndex - 1)
+	local simpleName = string.sub(fullTimerName, underscoreIndex + 1)
+
+	return tonumber(playerIdStr), simpleName
+end
+
 -- Initialize the timer module
 function Timers.Initialize()
 	Utility.Log(debugSystem, "info", "Initializing Timer module")
@@ -123,12 +146,17 @@ function Timers.Initialize()
 		end
 
 		-- Listen for timer updates from the server
-		updateEvent.OnClientEvent:Connect(function(timerName, timeRemaining, isComplete)
+		updateEvent.OnClientEvent:Connect(function(fullTimerName, timeRemaining, isComplete)
 			-- Update local timers based on server data
 			local localPlayer = Players.LocalPlayer
 			if not localPlayer then return end
 
-			local simpleName = timerName:gsub("^" .. localPlayer.UserId .. "_", "")
+			-- Parse the full timer name to get the player ID and simple name
+			local timerPlayerId, simpleName = Timers.ParseFullTimerName(fullTimerName)
+
+			-- Only update timers for this client
+			if timerPlayerId ~= localPlayer.UserId then return end
+
 			local timer = Timers.GetTimer(localPlayer, simpleName)
 
 			if timer then
@@ -172,7 +200,7 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 	callbacks = callbacks or {}
 
 	-- Generate the full timer name with player ID
-	local fullTimerName = player.UserId .. "_" .. name
+	local fullTimerName = Timers.GetFullTimerName(player.UserId, name)
 
 	-- Check if timer already exists
 	if Timers.TimerExists(player, name) then
@@ -197,7 +225,9 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 			onCancel = callbacks.onCancel,
 			onHalfway = callbacks.onHalfway,
 			onLowTime = callbacks.onLowTime,
-			onStart = callbacks.onStart
+			onStart = callbacks.onStart,
+			onPause = callbacks.onPause,
+			onResume = callbacks.onResume
 		},
 		initialCallbacksFired = false
 	}, Timer)
@@ -218,11 +248,8 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 		Timers.SaveTimer(player, name, timer)
 	end
 
-	-- Fire onStart callback immediately
-	if timer.callbacks.onStart then
-		task.spawn(timer.callbacks.onStart, timer)
-		timer.initialCallbacksFired = true
-	end
+	-- We no longer fire onStart callback immediately
+	-- Let the update loop handle this to avoid duplicate firing
 
 	return timer
 end
@@ -240,6 +267,15 @@ function Timers.GetTimer(player, name)
 	if not timerRegistry[player.UserId] then return nil end
 
 	return timerRegistry[player.UserId][name]
+end
+
+-- Get a timer object by its full name
+function Timers.GetTimerByFullName(fullTimerName)
+	local playerId, simpleName = Timers.ParseFullTimerName(fullTimerName)
+	if not playerId or not simpleName then return nil end
+	if not timerRegistry[playerId] then return nil end
+
+	return timerRegistry[playerId][simpleName]
 end
 
 -- Get the time remaining for a timer
@@ -284,6 +320,23 @@ function Timers.CancelTimer(player, name)
 	end
 
 	return true
+end
+
+-- Cancel a timer by its full name
+function Timers.CancelTimerByFullName(fullTimerName)
+	local playerId, simpleName = Timers.ParseFullTimerName(fullTimerName)
+	if not playerId or not simpleName then 
+		Utility.Log(debugSystem, "warn", "Invalid full timer name: " .. tostring(fullTimerName))
+		return false 
+	end
+
+	local player = Players:GetPlayerByUserId(playerId)
+	if not player then
+		Utility.Log(debugSystem, "warn", "Player with ID " .. playerId .. " not found")
+		return false
+	end
+
+	return Timers.CancelTimer(player, simpleName)
 end
 
 -- Complete a timer (called internally when a timer reaches zero)
@@ -376,6 +429,13 @@ function Timers.StartUpdateLoop()
 		return 
 	end
 
+	-- IMPORTANT: Timer callback execution control flow
+	-- 1. When a timer is created, we set initialCallbacksFired = false
+	-- 2. We do NOT fire the onStart callback in CreateTimer anymore
+	-- 3. The first update cycle will fire onStart and set initialCallbacksFired = true
+	-- 4. Subsequent update cycles will skip the onStart firing
+	-- This prevents the onStart callback from being executed twice
+
 	local lastUpdateTime = os.time()
 	Utility.Log(debugSystem, "info", "Starting timer update loop")
 
@@ -395,13 +455,16 @@ function Timers.StartUpdateLoop()
 		-- Update all timers
 		for playerId, playerTimers in pairs(timerRegistry) do
 			for timerName, timer in pairs(playerTimers) do
-				-- Skip updating if timer was just created (allow all callbacks to be set up first)
+				-- Check if it's the timer's first update cycle
 				if not timer.initialCallbacksFired then
-					-- Fire onStart callback if not already fired
+					-- Fire onStart callback - this should only happen once per timer
 					if timer.callbacks.onStart then
+						Utility.Log(debugSystem, "info", "Firing onStart callback for timer: " .. timer.simpleName)
 						task.spawn(timer.callbacks.onStart, timer)
 					end
 					timer.initialCallbacksFired = true
+					-- Skip the rest of the update for this timer's first cycle
+					-- to avoid updating it before callbacks are properly set up
 					continue
 				end
 
@@ -416,10 +479,10 @@ function Timers.StartUpdateLoop()
 							Timers.SaveTimer(player, timerName, timer)
 						end
 
-						-- Send update to client
+						-- Send update to client - using the full timer name for proper identification
 						updateEvent:FireClient(
 							player, 
-							timer.name, 
+							timer.name, -- Using full timer name (e.g. "12345_Crystals")
 							timer.timeRemaining, 
 							timer.isComplete
 						)
@@ -509,53 +572,6 @@ function Timers.SaveTimer(player, name, timer)
 
 	-- No logging for routine saves
 	return true
-end
-
--- Helper function for updating a timer
-local function updateTimer(timer, deltaTime)
-	if timer.isComplete then return false end
-
-	-- Update the timer
-	local previousTimeRemaining = timer.timeRemaining
-	timer.timeRemaining = math.max(0, timer.timeRemaining - deltaTime)
-
-	-- Check for halfway point
-	if not timer.isHalfwayReached and timer.timeRemaining <= timer.duration / 2 then
-		timer.isHalfwayReached = true
-		Utility.Log(debugSystem, "info", "Timer " .. timer.simpleName .. " reached halfway point")
-		if timer.callbacks.onHalfway then
-			task.spawn(timer.callbacks.onHalfway, timer)
-		end
-	end
-
-	-- Check for low time
-	if not timer.isLowTimeReached and timer.timeRemaining <= timer.lowTimeThreshold then
-		timer.isLowTimeReached = true
-		Utility.Log(debugSystem, "info", "Timer " .. timer.simpleName .. " reached low time threshold")
-		if timer.callbacks.onLowTime then
-			task.spawn(timer.callbacks.onLowTime, timer)
-		end
-	end
-
-	-- Only call tick if time actually changed (by at least 0.1 second to avoid excessive callbacks)
-	if math.abs(previousTimeRemaining - timer.timeRemaining) >= 0.1 and timer.callbacks.onTick then
-		task.spawn(timer.callbacks.onTick, timer)
-	end
-
-	-- Check for completion
-	if timer.timeRemaining <= 0 and not timer.isComplete then
-		timer.isComplete = true
-		Utility.Log(debugSystem, "info", "Timer " .. timer.simpleName .. " completed")
-
-		-- Call the onComplete callback
-		if timer.callbacks.onComplete then
-			task.spawn(timer.callbacks.onComplete, timer)
-		end
-
-		return true -- Timer completed
-	end
-
-	return false -- Timer still active
 end
 
 -- Remove timer data from player stats
@@ -671,8 +687,9 @@ function Timers.LoadPlayerTimers(player)
 			local lowTimeThreshold = getValue("LowTimeThreshold", duration * LOW_TIME_THRESHOLD)
 
 			-- Create timer in memory
+			local fullTimerName = Timers.GetFullTimerName(player.UserId, timerName)
 			local timer = setmetatable({
-				name = player.UserId .. "_" .. timerName,
+				name = fullTimerName,
 				simpleName = timerName,
 				playerId = player.UserId,
 				duration = duration,
@@ -730,6 +747,7 @@ function Timers.GetAllPlayersTimers()
 				isComplete = timer.isComplete,
 				playerId = timer.playerId,
 				simpleName = timer.simpleName,
+				fullName = timer.name,
 				-- Include additional timer metadata as needed
 				isHalfwayReached = timer.isHalfwayReached,
 				isLowTimeReached = timer.isLowTimeReached

@@ -171,7 +171,7 @@ local function updateDashboard(scrollFrame)
 		playerLabel.Font = Enum.Font.SourceSansBold
 		playerLabel.TextXAlignment = Enum.TextXAlignment.Left
 		playerLabel.TextYAlignment = Enum.TextYAlignment.Center
-		playerLabel.Text = "  " .. playerName
+		playerLabel.Text = "  " .. playerName .. " (ID: " .. userId .. ")"
 		playerLabel.Parent = playerHeader
 
 		-- Add timer entries for this player
@@ -225,13 +225,25 @@ local function updateDashboard(scrollFrame)
 			cancelButton.BorderSizePixel = 0
 			cancelButton.Parent = timerEntry
 
+			-- Store the full name in the button's attributes for later use
+			if timerData.fullName then
+				cancelButton:SetAttribute("FullTimerName", timerData.fullName)
+			end
+
 			-- Handle cancel button click
 			cancelButton.MouseButton1Click:Connect(function()
-				local timerPlayer = Players:GetPlayerByUserId(userId)
-				if timerPlayer then
-					Timers.CancelTimer(timerPlayer, timerName)
-					updateDashboard(scrollFrame)
+				local fullTimerName = cancelButton:GetAttribute("FullTimerName")
+				if fullTimerName then
+					-- Cancel using the full timer name
+					Timers.CancelTimerByFullName(fullTimerName)
+				else
+					-- Fallback to the old method
+					local timerPlayer = Players:GetPlayerByUserId(userId)
+					if timerPlayer then
+						Timers.CancelTimer(timerPlayer, timerName)
+					end
 				end
+				updateDashboard(scrollFrame)
 			end)
 		end
 	end
@@ -277,3 +289,4 @@ end)
 
 -- Start the update loop
 spawn(startUpdateLoop)
+-- /ServerScriptService/AdminTools/TimerDashboard.lua

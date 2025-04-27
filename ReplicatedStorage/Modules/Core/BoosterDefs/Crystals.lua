@@ -153,7 +153,7 @@ CrystalBooster.onActivate = function(player, qty)
 		lowTimeThreshold = 2
 	}
 
-	-- Create the timer
+	-- Create the timer - the Timers module now uses player.UserId to prefix the timer name internally
 	local timer = Timers.CreateTimer(player, timerName, totalDuration, callbacks)
 
 	if not timer then
