@@ -1,4 +1,4 @@
--- /ReplicatedStorage/Modules/UI/SizeSlider.lua
+-- /ReplicatedStorage/Modules/Core/SizeSlider.lua
 -- ModuleScript that creates and manages a character size slider UI component
 
 local SizeSlider = {}
@@ -11,7 +11,11 @@ local RunService = game:GetService("RunService")
 
 -- References
 local ScaleCharacter = require(ReplicatedStorage.Modules.Core.ScaleCharacter)
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 local player = Players.LocalPlayer
+
+-- Debug settings
+local debugSystem = "SizeSlider" -- System name for debug logs
 
 -- Configuration
 SizeSlider.DetentValues = {0.25, 0.5, 0.75, 1, 2, 4, 8}
@@ -26,6 +30,7 @@ local handle = nil
 local handleOriginalPosition = nil
 local trackWidth = nil
 local detentPositions = {}
+local isInitialized = false
 
 -- Helper function to calculate positions for each detent on the slider track
 local function calculateDetentPositions()
@@ -118,9 +123,32 @@ local function createDetentIndicators()
 	end
 end
 
+-- Reset the slider to default size
+function SizeSlider.Reset()
+	Utility.Log(debugSystem, "info", "SizeSlider.Reset called")
+	currentSizeIndex = SizeSlider.DefaultSizeIndex
+	if sliderUI then
+		setHandlePosition(currentSizeIndex)
+		if sliderUI:FindFirstChild("ValueText") then
+			sliderUI.ValueText.Text = tostring(SizeSlider.DetentValues[currentSizeIndex]) .. "x"
+		end
+	end
+end
+
 -- Initialize the slider UI
 function SizeSlider.Initialize(sliderFrame)
+	Utility.Log(debugSystem, "info", "SizeSlider.Initialize called with frame: " .. (sliderFrame and sliderFrame:GetFullName() or "nil"))
+
+	if isInitialized then 
+		Utility.Log(debugSystem, "info", "SizeSlider already initialized, returning early")
+		return SizeSlider 
+	end
+
 	sliderUI = sliderFrame
+	if not sliderUI then
+		Utility.Log(debugSystem, "warn", "sliderFrame is nil, cannot initialize")
+		return SizeSlider
+	end
 
 	-- Create the slider track
 	local track = Instance.new("Frame")
@@ -172,6 +200,7 @@ function SizeSlider.Initialize(sliderFrame)
 		isDragging = true
 		-- Do not apply the scale yet, just store the original index to revert if needed
 		pendingSizeIndex = currentSizeIndex
+		Utility.Log(debugSystem, "info", "Handle drag started")
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
@@ -181,6 +210,7 @@ function SizeSlider.Initialize(sliderFrame)
 			if pendingSizeIndex and pendingSizeIndex ~= currentSizeIndex then
 				currentSizeIndex = pendingSizeIndex
 				applyCharacterScale()
+				Utility.Log(debugSystem, "info", "Character scale changed to " .. SizeSlider.DetentValues[currentSizeIndex])
 			end
 			pendingSizeIndex = nil
 		end
@@ -216,14 +246,66 @@ function SizeSlider.Initialize(sliderFrame)
 		setHandlePosition(currentSizeIndex)
 	end)
 
-	-- Apply initial scale
-	applyCharacterScale()
+	-- Connect to visibility events
+	local function setupVisibilityEvents()
+		Utility.Log(debugSystem, "info", "Setting up visibility events")
 
+		local eventsFolder
+		local success, err = pcall(function()
+			eventsFolder = ReplicatedStorage:WaitForChild("Events", 10)
+		end)
+
+		if not success or not eventsFolder then
+			Utility.Log(debugSystem, "warn", "Failed to find Events folder: " .. tostring(err))
+			return
+		end
+
+		local coreFolder
+		success, err = pcall(function()
+			coreFolder = eventsFolder:WaitForChild("Core", 10)
+		end)
+
+		if not success or not coreFolder then
+			Utility.Log(debugSystem, "warn", "Failed to find Core folder: " .. tostring(err))
+			return
+		end
+
+		local sliderEvent
+		success, err = pcall(function()
+			sliderEvent = coreFolder:WaitForChild("SizeSliderVisibility", 10)
+		end)
+
+		if not success or not sliderEvent then
+			Utility.Log(debugSystem, "warn", "Failed to find SizeSliderVisibility event: " .. tostring(err))
+			return
+		end
+
+		Utility.Log(debugSystem, "info", "Successfully found SizeSliderVisibility event")
+
+		sliderEvent.OnClientEvent:Connect(function(visible)
+			Utility.Log(debugSystem, "info", "Received visibility event with value: " .. tostring(visible))
+			SizeSlider.SetVisible(visible)
+			if visible == false then
+				-- Reset to default size when hiding
+				SizeSlider.Reset()
+			end
+		end)
+	end
+
+	task.spawn(setupVisibilityEvents)
+
+	-- Hide slider by default
+	sliderUI.Visible = false
+	Utility.Log(debugSystem, "info", "Slider initialized and hidden by default")
+
+	isInitialized = true
 	return SizeSlider
 end
 
 -- Set size programmatically
 function SizeSlider.SetSize(sizeValue)
+	Utility.Log(debugSystem, "info", "SizeSlider.SetSize called with value: " .. tostring(sizeValue))
+
 	-- Find the index of the closest size value
 	local closestIndex = 1
 	local closestDistance = math.huge
@@ -243,31 +325,85 @@ end
 
 -- Show/hide the slider
 function SizeSlider.SetVisible(visible)
+	Utility.Log(debugSystem, "info", "SizeSlider.SetVisible called with value: " .. tostring(visible))
+
 	if sliderUI then
 		sliderUI.Visible = visible
+		Utility.Log(debugSystem, "info", "Slider visibility set to " .. tostring(visible))
+
+		if visible == true then
+			-- Apply current scale when showing
+			applyCharacterScale()
+		end
+	else
+		Utility.Log(debugSystem, "warn", "sliderUI is nil, cannot set visibility")
 	end
 end
 
--- For testing - auto-initialize when the module is required
--- This will need to be removed later when we implement show/hide functionality
+-- For client-side initialization
 if RunService:IsClient() then
-	local function initializeWhenReady()
-		local player = Players.LocalPlayer
-		if not player then
-			Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
-			player = Players.LocalPlayer
+	local function findAndInitializeSlider()
+		Utility.Log(debugSystem, "info", "Auto-initialization function started")
+
+		if isInitialized then 
+			Utility.Log(debugSystem, "info", "SizeSlider already initialized in auto-init")
+			return 
 		end
 
-		local playerGui = player:WaitForChild("PlayerGui")
-		local hud = playerGui:WaitForChild("HUD")
-		local bottomHUD = hud:WaitForChild("BottomHUD")
-		local sizeSlider = bottomHUD:WaitForChild("SizeSlider")
+		local player = Players.LocalPlayer
+		if not player then
+			Utility.Log(debugSystem, "info", "Waiting for LocalPlayer")
+			Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+			player = Players.LocalPlayer
+			Utility.Log(debugSystem, "info", "LocalPlayer available: " .. player.Name)
+		end
 
+		local playerGui
+		local success, err = pcall(function()
+			playerGui = player:WaitForChild("PlayerGui", 10)
+		end)
+
+		if not success or not playerGui then
+			Utility.Log(debugSystem, "warn", "Failed to find PlayerGui: " .. tostring(err))
+			return
+		end
+
+		local hud
+		success, err = pcall(function()
+			hud = playerGui:WaitForChild("HUD", 10)
+		end)
+
+		if not success or not hud then
+			Utility.Log(debugSystem, "warn", "Failed to find HUD: " .. tostring(err))
+			return
+		end
+
+		local bottomHUD
+		success, err = pcall(function()
+			bottomHUD = hud:WaitForChild("BottomHUD", 10)
+		end)
+
+		if not success or not bottomHUD then
+			Utility.Log(debugSystem, "warn", "Failed to find BottomHUD: " .. tostring(err))
+			return
+		end
+
+		local sizeSlider
+		success, err = pcall(function()
+			sizeSlider = bottomHUD:WaitForChild("SizeSlider", 10)
+		end)
+
+		if not success or not sizeSlider then
+			Utility.Log(debugSystem, "warn", "Failed to find SizeSlider: " .. tostring(err))
+			return
+		end
+
+		Utility.Log(debugSystem, "info", "Found SizeSlider UI, initializing")
 		SizeSlider.Initialize(sizeSlider)
 	end
 
-	task.spawn(initializeWhenReady)
+	task.spawn(findAndInitializeSlider)
 end
 
 return SizeSlider
--- /ReplicatedStorage/Modules/UI/SizeSlider.lua
+-- /ReplicatedStorage/Modules/Core/SizeSlider.lua
