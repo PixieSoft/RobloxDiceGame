@@ -1,5 +1,5 @@
--- /ReplicatedStorage/Modules/Core/Timers.lua
--- ModuleScript that provides timer functionality for managing timed events, effects, and boosters
+-- /ServerScriptService/Modules/Core/Timers.lua
+-- ModuleScript that provides enhanced timer functionality with support for custom values
 
 local Timers = {}
 
@@ -27,14 +27,25 @@ local activeTimersCount = 0 -- Track how many timers are active for performance
 local remoteFolder
 local updateEvent
 local commandEvent
+local customValuesEvent -- New event for syncing custom values
 
 -- Constants
 local UPDATE_INTERVAL = 0.1 -- How often to update timers (in seconds)
 local LOW_TIME_THRESHOLD = 0.1 -- Default low time threshold (10% of total duration)
+local MAX_CUSTOM_VALUES_SIZE = 1024 * 8 -- 8 KB max size for custom values (to prevent abuse)
 
 -- Timer class definition
 local Timer = {}
 Timer.__index = Timer
+
+-- Helper function to check if a value can be saved to DataStore
+local function isDataStoreSafe(value)
+	local valueType = typeof(value)
+	return valueType == "number" or 
+		valueType == "string" or 
+		valueType == "boolean" or
+		(valueType == "table" and not next(value)) -- Empty tables are fine
+end
 
 -- Helper function to generate a consistent fully qualified timer name
 -- @param playerId (number) - The player's UserId
@@ -99,11 +110,27 @@ function Timers.Initialize()
 			Utility.Log(debugSystem, "info", "Created TimerCommand RemoteEvent")
 		end
 
+		-- Create custom values event (server to client)
+		customValuesEvent = coreFolder:FindFirstChild("TimerCustomValues")
+		if not customValuesEvent then
+			customValuesEvent = Instance.new("RemoteEvent")
+			customValuesEvent.Name = "TimerCustomValues"
+			customValuesEvent.Parent = coreFolder
+			Utility.Log(debugSystem, "info", "Created TimerCustomValues RemoteEvent")
+		end
+
 		-- Listen for timer commands from clients
 		commandEvent.OnServerEvent:Connect(function(player, command, timerName, ...)
 			Utility.Log(debugSystem, "info", "Received command: " .. command .. " for timer: " .. timerName .. " from player: " .. player.Name)
 			if command == "cancel" then
 				Timers.CancelTimer(player, timerName)
+			elseif command == "setCustomValue" then
+				local key, value = ...
+				Timers.SetCustomValue(player, timerName, key, value)
+			elseif command == "getCustomValue" then
+				local key = ...
+				local value = Timers.GetCustomValue(player, timerName, key)
+				customValuesEvent:FireClient(player, timerName, key, value)
 			end
 		end)
 
@@ -139,8 +166,9 @@ function Timers.Initialize()
 
 		updateEvent = coreFolder:WaitForChild("TimerUpdate", 10)
 		commandEvent = coreFolder:WaitForChild("TimerCommand", 10)
+		customValuesEvent = coreFolder:WaitForChild("TimerCustomValues", 10)
 
-		if not updateEvent or not commandEvent then
+		if not updateEvent or not commandEvent or not customValuesEvent then
 			Utility.Log(debugSystem, "warn", "Failed to find timer remote events")
 			return false
 		end
@@ -171,6 +199,23 @@ function Timers.Initialize()
 				end
 			end
 		end)
+
+		-- Listen for custom value updates from the server
+		customValuesEvent.OnClientEvent:Connect(function(timerName, key, value)
+			local localPlayer = Players.LocalPlayer
+			if not localPlayer then return end
+
+			local timer = Timers.GetTimer(localPlayer, timerName)
+			if timer then
+				timer.customValues = timer.customValues or {}
+				timer.customValues[key] = value
+
+				-- Fire the onCustomValueChanged callback if it exists
+				if timer.callbacks.onCustomValueChanged then
+					task.spawn(timer.callbacks.onCustomValueChanged, timer, key, value)
+				end
+			end
+		end)
 	end
 
 	-- Start the timer update loop
@@ -181,7 +226,13 @@ function Timers.Initialize()
 end
 
 -- Create a new timer
-function Timers.CreateTimer(player, name, duration, callbacks)
+-- @param player (Player) - The player to associate the timer with
+-- @param name (string) - The name of the timer
+-- @param duration (number) - The duration of the timer in seconds
+-- @param callbacks (table) - Table of callback functions for timer events
+-- @param customValues (table) - Optional table of custom values to associate with the timer
+-- @return (Timer) - The created timer object
+function Timers.CreateTimer(player, name, duration, callbacks, customValues)
 	if type(player) ~= "userdata" or not player:IsA("Player") then
 		Utility.Log(debugSystem, "warn", "Invalid player object provided to CreateTimer")
 		return nil
@@ -198,6 +249,15 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 	end
 
 	callbacks = callbacks or {}
+	customValues = customValues or {}
+
+	-- Validate custom values
+	for key, value in pairs(customValues) do
+		if type(key) ~= "string" then
+			Utility.Log(debugSystem, "warn", "Custom value keys must be strings: " .. tostring(key))
+			customValues[key] = nil
+		end
+	end
 
 	-- Generate the full timer name with player ID
 	local fullTimerName = Timers.GetFullTimerName(player.UserId, name)
@@ -227,8 +287,10 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 			onLowTime = callbacks.onLowTime,
 			onStart = callbacks.onStart,
 			onPause = callbacks.onPause,
-			onResume = callbacks.onResume
+			onResume = callbacks.onResume,
+			onCustomValueChanged = callbacks.onCustomValueChanged -- New callback for custom value changes
 		},
+		customValues = customValues, -- Store custom values
 		initialCallbacksFired = false
 	}, Timer)
 
@@ -241,15 +303,12 @@ function Timers.CreateTimer(player, name, duration, callbacks)
 	timerRegistry[player.UserId][name] = timer
 	activeTimersCount = activeTimersCount + 1
 	Utility.Log(debugSystem, "info", "Created timer: " .. name .. " for player: " .. player.Name .. 
-		" with duration: " .. duration .. "s")
+		" with duration: " .. duration .. "s and " .. table.getn(customValues) .. " custom values")
 
 	-- Save timer to player data
 	if IsServer then
 		Timers.SaveTimer(player, name, timer)
 	end
-
-	-- We no longer fire onStart callback immediately
-	-- Let the update loop handle this to avoid duplicate firing
 
 	return timer
 end
@@ -284,6 +343,154 @@ function Timers.GetTimeRemaining(player, name)
 	if not timer then return 0 end
 
 	return timer.timeRemaining
+end
+
+-- Set a custom value for a timer
+-- @param player (Player) - The player associated with the timer
+-- @param name (string) - The name of the timer
+-- @param key (string) - The key for the custom value
+-- @param value (any) - The value to set (must be DataStore safe)
+-- @return (boolean) - Whether the value was set successfully
+function Timers.SetCustomValue(player, name, key, value)
+	local timer = Timers.GetTimer(player, name)
+	if not timer then 
+		Utility.Log(debugSystem, "warn", "Attempted to set custom value for non-existent timer: " .. name)
+		return false 
+	end
+
+	if type(key) ~= "string" then
+		Utility.Log(debugSystem, "warn", "Custom value key must be a string")
+		return false
+	end
+
+	-- Initialize customValues if it doesn't exist
+	timer.customValues = timer.customValues or {}
+
+	-- Store the value
+	timer.customValues[key] = value
+
+	-- Sync with client if needed
+	if IsServer and player then
+		customValuesEvent:FireClient(player, name, key, value)
+	elseif IsClient then
+		-- If on client, send to server for syncing
+		commandEvent:FireServer("setCustomValue", name, key, value)
+	end
+
+	-- Save timer data
+	if IsServer then
+		Timers.SaveTimer(player, name, timer)
+	end
+
+	Utility.Log(debugSystem, "info", "Set custom value '" .. key .. "' for timer: " .. name)
+
+	-- Fire the onCustomValueChanged callback if it exists
+	if timer.callbacks.onCustomValueChanged then
+		task.spawn(timer.callbacks.onCustomValueChanged, timer, key, value)
+	end
+
+	return true
+end
+
+-- Get a custom value from a timer
+-- @param player (Player) - The player associated with the timer
+-- @param name (string) - The name of the timer
+-- @param key (string) - The key for the custom value
+-- @param defaultValue (any) - Optional default value to return if the key doesn't exist
+-- @return (any) - The custom value or the default value if the key doesn't exist
+function Timers.GetCustomValue(player, name, key, defaultValue)
+	local timer = Timers.GetTimer(player, name)
+	if not timer then 
+		Utility.Log(debugSystem, "warn", "Attempted to get custom value from non-existent timer: " .. name)
+		return defaultValue 
+	end
+
+	if not timer.customValues then
+		return defaultValue
+	end
+
+	-- If on client and the value doesn't exist, request it from the server
+	if IsClient and timer.customValues[key] == nil and not timer.pendingValueRequests then
+		timer.pendingValueRequests = timer.pendingValueRequests or {}
+
+		-- Only request once
+		if not timer.pendingValueRequests[key] then
+			timer.pendingValueRequests[key] = true
+			commandEvent:FireServer("getCustomValue", name, key)
+		end
+	end
+
+	return timer.customValues[key] ~= nil and timer.customValues[key] or defaultValue
+end
+
+-- Get all custom values for a timer
+-- @param player (Player) - The player associated with the timer
+-- @param name (string) - The name of the timer
+-- @return (table) - All custom values for the timer
+function Timers.GetAllCustomValues(player, name)
+	local timer = Timers.GetTimer(player, name)
+	if not timer then 
+		Utility.Log(debugSystem, "warn", "Attempted to get all custom values from non-existent timer: " .. name)
+		return {} 
+	end
+
+	return timer.customValues or {}
+end
+
+-- Check if a custom value exists in a timer
+-- @param player (Player) - The player associated with the timer
+-- @param name (string) - The name of the timer
+-- @param key (string) - The key for the custom value
+-- @return (boolean) - Whether the custom value exists
+function Timers.HasCustomValue(player, name, key)
+	local timer = Timers.GetTimer(player, name)
+	if not timer or not timer.customValues then 
+		return false 
+	end
+
+	return timer.customValues[key] ~= nil
+end
+
+-- Remove a custom value from a timer
+-- @param player (Player) - The player associated with the timer
+-- @param name (string) - The name of the timer
+-- @param key (string) - The key for the custom value
+-- @return (boolean) - Whether the value was removed successfully
+function Timers.RemoveCustomValue(player, name, key)
+	local timer = Timers.GetTimer(player, name)
+	if not timer or not timer.customValues then 
+		return false 
+	end
+
+	-- Check if value exists
+	if timer.customValues[key] == nil then
+		return false
+	end
+
+	-- Remove the value
+	timer.customValues[key] = nil
+
+	-- Sync with client if needed
+	if IsServer and player then
+		customValuesEvent:FireClient(player, name, key, nil)
+	elseif IsClient then
+		-- If on client, send to server for syncing
+		commandEvent:FireServer("setCustomValue", name, key, nil)
+	end
+
+	-- Save timer data
+	if IsServer then
+		Timers.SaveTimer(player, name, timer)
+	end
+
+	Utility.Log(debugSystem, "info", "Removed custom value '" .. key .. "' from timer: " .. name)
+
+	-- Fire the onCustomValueChanged callback if it exists
+	if timer.callbacks.onCustomValueChanged then
+		task.spawn(timer.callbacks.onCustomValueChanged, timer, key, nil)
+	end
+
+	return true
 end
 
 -- Cancel a timer
@@ -570,6 +777,60 @@ function Timers.SaveTimer(player, name, timer)
 	setOrCreateValue("IsLowTimeReached", "BoolValue", timer.isLowTimeReached)
 	setOrCreateValue("LowTimeThreshold", "NumberValue", timer.lowTimeThreshold)
 
+	-- Save custom values in a separate folder
+	local customValuesFolder = timerFolder:FindFirstChild("CustomValues")
+	if not customValuesFolder then
+		customValuesFolder = Instance.new("Folder")
+		customValuesFolder.Name = "CustomValues"
+		customValuesFolder.Parent = timerFolder
+	end
+
+	-- Remove any existing custom values that are no longer in the timer
+	for _, customValueObj in pairs(customValuesFolder:GetChildren()) do
+		if not timer.customValues or timer.customValues[customValueObj.Name] == nil then
+			customValueObj:Destroy()
+		end
+	end
+
+	-- Save each custom value
+	if timer.customValues then
+		for key, value in pairs(timer.customValues) do
+			-- Skip values that aren't DataStore safe
+			if not isDataStoreSafe(value) then
+				Utility.Log(debugSystem, "warn", "Skipping non-DataStore safe value for key: " .. key)
+				continue
+			end
+
+			-- Set value based on its type
+			local valueType
+			if type(value) == "number" then
+				valueType = "NumberValue"
+			elseif type(value) == "string" then
+				valueType = "StringValue"
+			elseif type(value) == "boolean" then
+				valueType = "BoolValue"
+			else
+				-- Skip values that can't be saved directly
+				continue
+			end
+
+			-- Create or update the value
+			local valueObj = customValuesFolder:FindFirstChild(key)
+			if not valueObj then
+				valueObj = Instance.new(valueType)
+				valueObj.Name = key
+				valueObj.Parent = customValuesFolder
+			elseif valueObj.ClassName ~= valueType then
+				-- If the type changed, replace the value object
+				valueObj:Destroy()
+				valueObj = Instance.new(valueType)
+				valueObj.Name = key
+				valueObj.Parent = customValuesFolder
+			end
+			valueObj.Value = value
+		end
+	end
+
 	-- No logging for routine saves
 	return true
 end
@@ -686,6 +947,15 @@ function Timers.LoadPlayerTimers(player)
 			local isLowTimeReached = getValue("IsLowTimeReached", false)
 			local lowTimeThreshold = getValue("LowTimeThreshold", duration * LOW_TIME_THRESHOLD)
 
+			-- Load custom values
+			local customValues = {}
+			local customValuesFolder = timerFolder:FindFirstChild("CustomValues")
+			if customValuesFolder then
+				for _, valueObj in ipairs(customValuesFolder:GetChildren()) do
+					customValues[valueObj.Name] = valueObj.Value
+				end
+			end
+
 			-- Create timer in memory
 			local fullTimerName = Timers.GetFullTimerName(player.UserId, timerName)
 			local timer = setmetatable({
@@ -699,6 +969,7 @@ function Timers.LoadPlayerTimers(player)
 				isLowTimeReached = isLowTimeReached,
 				lowTimeThreshold = lowTimeThreshold,
 				callbacks = {},
+				customValues = customValues, -- Include the loaded custom values
 				initialCallbacksFired = true -- Don't trigger onStart again for loaded timers
 			}, Timer)
 
@@ -748,9 +1019,9 @@ function Timers.GetAllPlayersTimers()
 				playerId = timer.playerId,
 				simpleName = timer.simpleName,
 				fullName = timer.name,
-				-- Include additional timer metadata as needed
 				isHalfwayReached = timer.isHalfwayReached,
-				isLowTimeReached = timer.isLowTimeReached
+				isLowTimeReached = timer.isLowTimeReached,
+				customValues = table.clone(timer.customValues or {})
 			}
 		end
 	end
@@ -780,4 +1051,4 @@ end
 Timers.Initialize()
 
 return Timers
--- /ReplicatedStorage/Modules/Core/Timers.lua
+-- /ServerScriptService/Modules/Core/Timers.lua
