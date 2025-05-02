@@ -1,4 +1,4 @@
--- /StarterGui/Scripts/HUD/PhysicsInfo.lua
+-- /StarterGui/Scripts/DevTools/PhysicsInfo.lua
 -- LocalScript that creates a dynamic GUI for viewing and modifying character physics properties
 
 local Players = game:GetService("Players")
@@ -407,4 +407,3 @@ script.AncestryChanged:Connect(function(_, newParent)
 end)
 
 print("Physics Info GUI initialized with mass and density display")
--- /StarterGui/Scripts/HUD/PhysicsInfo.lua
