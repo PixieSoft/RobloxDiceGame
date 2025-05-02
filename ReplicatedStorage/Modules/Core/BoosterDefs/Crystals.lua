@@ -219,6 +219,9 @@ CrystalBooster.onActivate = function(player, qty)
 		Utility.Log(debugSystem, "warn", "Failed to create timer for " .. player.Name)
 		return function() end
 	end
+	
+	-- Add this line to store the crystal count
+	Timers.SetCustomValue(player, timerName, "Count", qty, "IntValue")
 
 	-- Return cleanup function that will run when the booster expires or is canceled
 	return function()

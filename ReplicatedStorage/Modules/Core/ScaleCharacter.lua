@@ -20,6 +20,11 @@ local IsClient = RunService:IsClient()
 ScaleCharacter.MIN_SCALE = 0.25
 ScaleCharacter.MAX_SCALE = 10.0
 
+-- Values for testing
+ScaleCharacter.BASE_SPEED = 16
+ScaleCharacter.BASE_HEIGHT = 7.2
+ScaleCharacter.BASE_POWER = 50
+
 -- Preset scale values
 ScaleCharacter.Presets = {
 	small = 0.25,

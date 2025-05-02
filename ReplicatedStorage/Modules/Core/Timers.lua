@@ -603,6 +603,136 @@ function Timers.RemoveTimer(player, name)
 	return false
 end
 
+-- Function to set a custom value for a timer
+-- @param player - The player associated with the timer
+-- @param timerName - The name of the timer
+-- @param valueName - The name of the custom value
+-- @param value - The value to set
+-- @param valueType - The type of value (e.g., "NumberValue", "StringValue", "BoolValue", "IntValue")
+function Timers.SetCustomValue(player, timerName, valueName, value, valueType)
+	if not IsServer then return false end
+	if not player or not timerName or not valueName then
+		Utility.Log(debugSystem, "warn", "Missing required parameters for SetCustomValue")
+		return false
+	end
+
+	-- Ensure player data is loaded
+	if not Stat.WaitForLoad(player) then
+		Utility.Log(debugSystem, "warn", "Failed to set custom value - player data not loaded")
+		return false
+	end
+
+	-- Get player data folder
+	local playerData = Stat.GetDataFolder(player)
+	if not playerData then
+		Utility.Log(debugSystem, "warn", "Failed to set custom value - player data folder not found")
+		return false
+	end
+
+	-- Get Timers folder
+	local timersFolder = playerData:FindFirstChild("Timers")
+	if not timersFolder then
+		timersFolder = Instance.new("Folder")
+		timersFolder.Name = "Timers"
+		timersFolder.Parent = playerData
+	end
+
+	-- Get timer folder
+	local timerFolder = timersFolder:FindFirstChild(timerName)
+	if not timerFolder then
+		Utility.Log(debugSystem, "warn", "Timer folder for " .. timerName .. " not found")
+		return false
+	end
+
+	-- Handle valueType defaults
+	if not valueType then
+		-- Determine valueType based on Lua type
+		if type(value) == "number" then
+			valueType = "NumberValue"
+		elseif type(value) == "string" then
+			valueType = "StringValue"
+		elseif type(value) == "boolean" then
+			valueType = "BoolValue"
+		else
+			Utility.Log(debugSystem, "warn", "Unsupported value type for " .. valueName)
+			return false
+		end
+	end
+
+	-- Validate valueType
+	if valueType ~= "NumberValue" and valueType ~= "StringValue" and 
+		valueType ~= "BoolValue" and valueType ~= "IntValue" then
+		Utility.Log(debugSystem, "warn", "Invalid valueType: " .. tostring(valueType))
+		return false
+	end
+
+	-- If IntValue is specified but the actual type is not an integer
+	if valueType == "IntValue" and (type(value) ~= "number" or value % 1 ~= 0) then
+		Utility.Log(debugSystem, "warn", "Value must be an integer for IntValue type")
+		return false
+	end
+
+	-- Create or update value
+	local valueObj = timerFolder:FindFirstChild(valueName)
+	if not valueObj then
+		valueObj = Instance.new(valueType)
+		valueObj.Name = valueName
+		valueObj.Parent = timerFolder
+	elseif valueObj.ClassName ~= valueType then
+		-- Type has changed, recreate the value
+		valueObj:Destroy()
+		valueObj = Instance.new(valueType)
+		valueObj.Name = valueName
+		valueObj.Parent = timerFolder
+	end
+
+	-- Set the value
+	valueObj.Value = value
+
+	Utility.Log(debugSystem, "info", "Set custom value " .. valueName .. " = " .. tostring(value) .. 
+		" (" .. valueType .. ") for timer " .. timerName)
+
+	return true
+end
+
+-- Function to get a custom value from a timer
+-- @param player - The player associated with the timer
+-- @param timerName - The name of the timer
+-- @param valueName - The name of the custom value
+-- @param defaultValue - The default value to return if the custom value doesn't exist
+-- @return The value, or defaultValue if not found
+function Timers.GetCustomValue(player, timerName, valueName, defaultValue)
+	if not player or not timerName or not valueName then
+		return defaultValue
+	end
+
+	-- Get player data folder
+	local playerData = Stat.GetDataFolder(player)
+	if not playerData then
+		return defaultValue
+	end
+
+	-- Get Timers folder
+	local timersFolder = playerData:FindFirstChild("Timers")
+	if not timersFolder then
+		return defaultValue
+	end
+
+	-- Get timer folder
+	local timerFolder = timersFolder:FindFirstChild(timerName)
+	if not timerFolder then
+		return defaultValue
+	end
+
+	-- Get value
+	local valueObj = timerFolder:FindFirstChild(valueName)
+	if not valueObj or not valueObj:IsA("ValueBase") then
+		return defaultValue
+	end
+
+	return valueObj.Value
+end
+
 -- Save all timers for a player (typically when they leave)
 function Timers.SaveAllPlayerTimers(player)
 	if not IsServer then return end
