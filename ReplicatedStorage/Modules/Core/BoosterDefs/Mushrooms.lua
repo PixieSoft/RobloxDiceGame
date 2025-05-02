@@ -7,6 +7,7 @@ local IsServer = RunService:IsServer()
 
 -- Import utility module
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+local Timers = require(ReplicatedStorage.Modules.Core.Timers)
 
 -- Create a table that we can reference from within its own methods
 local MushroomBooster = {}
@@ -71,6 +72,54 @@ MushroomBooster.onActivate = function(player, qty)
 		math.floor(percentBoost * 100) .. "% jump boost for " .. 
 		(qty * MushroomBooster.duration) .. " seconds")
 
+	-- Create a timer to track duration and handle effect removal
+	local timerName = "Mushrooms"
+	local totalDuration = qty * MushroomBooster.duration
+
+	-- Define timer callbacks
+	local callbacks = {
+		onStart = function(timer)
+			print("Started Mushroom jump boost timer for " .. player.Name)
+		end,
+
+		onTick = function(timer)
+			-- Optional: Could update UI here if needed
+		end,
+
+		onComplete = function(timer)
+			-- Reset jump values when timer completes
+			local currentCharacter = player.Character
+			if currentCharacter then
+				local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
+				if currentHumanoid then
+					currentHumanoid.JumpHeight = originalJumpHeight
+					currentHumanoid.JumpPower = originalJumpPower
+					print("Mushroom booster expired for " .. player.Name .. ": jump ability restored")
+				end
+			end
+		end,
+
+		onCancel = function(timer)
+			-- Reset jump values if timer is canceled
+			local currentCharacter = player.Character
+			if currentCharacter then
+				local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
+				if currentHumanoid then
+					currentHumanoid.JumpHeight = originalJumpHeight
+					currentHumanoid.JumpPower = originalJumpPower
+					print("Mushroom booster canceled for " .. player.Name .. ": jump ability restored")
+				end
+			end
+		end
+	}
+
+	-- Create the timer
+	local timer = Timers.CreateTimer(player, timerName, totalDuration, callbacks)
+	if timer then
+		-- Store the mushroom count as a custom value
+		Timers.SetCustomValue(player, timerName, "Count", qty, "IntValue")
+	end
+
 	-- Setup character added event in case player dies during effect
 	local characterAddedConnection
 	characterAddedConnection = player.CharacterAdded:Connect(function(newCharacter)
@@ -95,14 +144,19 @@ MushroomBooster.onActivate = function(player, qty)
 			characterAddedConnection:Disconnect()
 		end
 
-		-- Restore original jump values if the character still exists
-		local currentCharacter = player.Character
-		if currentCharacter then
-			local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
-			if currentHumanoid then
-				currentHumanoid.JumpHeight = originalJumpHeight
-				currentHumanoid.JumpPower = originalJumpPower
-				print("Mushroom booster expired for " .. player.Name .. ": jump ability restored")
+		-- Cancel the timer if it exists
+		if Timers.TimerExists(player, timerName) then
+			Timers.CancelTimer(player, timerName)
+		else
+			-- If timer doesn't exist (e.g., it completed naturally), restore jump values manually
+			local currentCharacter = player.Character
+			if currentCharacter then
+				local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
+				if currentHumanoid then
+					currentHumanoid.JumpHeight = originalJumpHeight
+					currentHumanoid.JumpPower = originalJumpPower
+					print("Mushroom booster cleanup: jump ability restored for " .. player.Name)
+				end
 			end
 		end
 	end
