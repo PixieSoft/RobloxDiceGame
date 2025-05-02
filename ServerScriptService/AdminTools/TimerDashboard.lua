@@ -10,109 +10,6 @@ local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 -- Configuration
 local UPDATE_INTERVAL = 3 -- How often to update the dashboard (seconds)
 
--- Create a simple dashboard UI for a player
-local function createDashboardForPlayer(player)
-	-- Create dashboard ScreenGui
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "TimerDashboard"
-	gui.ResetOnSpawn = false
-
-	-- Create background frame
-	local background = Instance.new("Frame")
-	background.Name = "Background"
-	background.Size = UDim2.new(0.3, 0, 0.5, 0)
-	background.Position = UDim2.new(0, 10, 1, -10 - background.Size.Y.Scale * 1000) -- Position at bottom left
-	background.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	background.BackgroundTransparency = 0.2
-	background.BorderSizePixel = 0
-	background.Parent = gui
-
-	-- Create title
-	local title = Instance.new("TextLabel")
-	title.Name = "Title"
-	title.Size = UDim2.new(1, 0, 0.08, 0)
-	title.Position = UDim2.new(0, 0, 0, 0)
-	title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	title.TextColor3 = Color3.fromRGB(255, 255, 255)
-	title.TextSize = 18
-	title.Font = Enum.Font.SourceSansBold
-	title.Text = "Timer Dashboard"
-	title.BorderSizePixel = 0
-	title.Parent = background
-
-	-- Create scroll frame for timer list
-	local scrollFrame = Instance.new("ScrollingFrame")
-	scrollFrame.Name = "TimerList"
-	scrollFrame.Size = UDim2.new(1, -10, 0.92, -10)
-	scrollFrame.Position = UDim2.new(0, 5, 0.08, 5)
-	scrollFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	scrollFrame.BorderSizePixel = 0
-	scrollFrame.ScrollBarThickness = 8
-	scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
-	scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-	scrollFrame.Parent = background
-
-	-- Create refresh button
-	local refreshButton = Instance.new("TextButton")
-	refreshButton.Name = "RefreshButton"
-	refreshButton.Size = UDim2.new(0.2, 0, 0.06, 0)
-	refreshButton.Position = UDim2.new(0.78, 0, 0.01, 0)
-	refreshButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-	refreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	refreshButton.TextSize = 14
-	refreshButton.Font = Enum.Font.SourceSans
-	refreshButton.Text = "Refresh"
-	refreshButton.BorderSizePixel = 0
-	refreshButton.Parent = background
-
-	-- Create close button
-	local closeButton = Instance.new("TextButton")
-	closeButton.Name = "CloseButton"
-	closeButton.Size = UDim2.new(0.08, 0, 0.05, 0)
-	closeButton.Position = UDim2.new(0.92, 0, 0, 0)
-	closeButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-	closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	closeButton.TextSize = 14
-	closeButton.Font = Enum.Font.SourceSansBold
-	closeButton.Text = "X"
-	closeButton.BorderSizePixel = 0
-	closeButton.Parent = background
-
-	-- Create toggle button (for showing/hiding the dashboard)
-	local toggleButton = Instance.new("TextButton")
-	toggleButton.Name = "ToggleButton"
-	toggleButton.Size = UDim2.new(0, 100, 0, 30)
-	toggleButton.Position = UDim2.new(0, 10, 1, -45)
-	toggleButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-	toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	toggleButton.TextSize = 14
-	toggleButton.Font = Enum.Font.SourceSansBold
-	toggleButton.Text = "Timers"
-	toggleButton.BorderSizePixel = 0
-	toggleButton.Parent = gui
-
-	-- Handle close button
-	closeButton.MouseButton1Click:Connect(function()
-		background.Visible = false
-	end)
-
-	-- Handle toggle button
-	toggleButton.MouseButton1Click:Connect(function()
-		background.Visible = not background.Visible
-	end)
-
-	-- Handle refresh button
-	refreshButton.MouseButton1Click:Connect(function()
-		updateDashboard(scrollFrame)
-	end)
-
-	-- Parent the GUI to the player
-	gui.Parent = player.PlayerGui
-
-	return scrollFrame
-end
-
 -- Update the dashboard with current timer data
 local function updateDashboard(scrollFrame)
 	-- Clear existing items
@@ -260,6 +157,109 @@ local function updateDashboard(scrollFrame)
 		noTimersLabel.Text = "No active timers"
 		noTimersLabel.Parent = scrollFrame
 	end
+end
+
+-- Create a simple dashboard UI for a player
+local function createDashboardForPlayer(player)
+	-- Create dashboard ScreenGui
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "TimerDashboard"
+	gui.ResetOnSpawn = false
+
+	-- Create background frame
+	local background = Instance.new("Frame")
+	background.Name = "Background"
+	background.Size = UDim2.new(0.3, 0, 0.5, 0)
+	background.Position = UDim2.new(0, 10, 1, -10 - background.Size.Y.Scale * 1000) -- Position at bottom left
+	background.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	background.BackgroundTransparency = 0.2
+	background.BorderSizePixel = 0
+	background.Parent = gui
+
+	-- Create title
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, 0, 0.08, 0)
+	title.Position = UDim2.new(0, 0, 0, 0)
+	title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.TextSize = 18
+	title.Font = Enum.Font.SourceSansBold
+	title.Text = "Timer Dashboard"
+	title.BorderSizePixel = 0
+	title.Parent = background
+
+	-- Create scroll frame for timer list
+	local scrollFrame = Instance.new("ScrollingFrame")
+	scrollFrame.Name = "TimerList"
+	scrollFrame.Size = UDim2.new(1, -10, 0.92, -10)
+	scrollFrame.Position = UDim2.new(0, 5, 0.08, 5)
+	scrollFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	scrollFrame.BorderSizePixel = 0
+	scrollFrame.ScrollBarThickness = 8
+	scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+	scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scrollFrame.Parent = background
+
+	-- Create refresh button
+	local refreshButton = Instance.new("TextButton")
+	refreshButton.Name = "RefreshButton"
+	refreshButton.Size = UDim2.new(0.2, 0, 0.06, 0)
+	refreshButton.Position = UDim2.new(0.78, 0, 0.01, 0)
+	refreshButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+	refreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	refreshButton.TextSize = 14
+	refreshButton.Font = Enum.Font.SourceSans
+	refreshButton.Text = "Refresh"
+	refreshButton.BorderSizePixel = 0
+	refreshButton.Parent = background
+
+	-- Create close button
+	local closeButton = Instance.new("TextButton")
+	closeButton.Name = "CloseButton"
+	closeButton.Size = UDim2.new(0.08, 0, 0.05, 0)
+	closeButton.Position = UDim2.new(0.92, 0, 0, 0)
+	closeButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+	closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeButton.TextSize = 14
+	closeButton.Font = Enum.Font.SourceSansBold
+	closeButton.Text = "X"
+	closeButton.BorderSizePixel = 0
+	closeButton.Parent = background
+
+	-- Create toggle button (for showing/hiding the dashboard)
+	local toggleButton = Instance.new("TextButton")
+	toggleButton.Name = "ToggleButton"
+	toggleButton.Size = UDim2.new(0, 100, 0, 30)
+	toggleButton.Position = UDim2.new(0, 10, 1, -45)
+	toggleButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+	toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	toggleButton.TextSize = 14
+	toggleButton.Font = Enum.Font.SourceSansBold
+	toggleButton.Text = "Timers"
+	toggleButton.BorderSizePixel = 0
+	toggleButton.Parent = gui
+
+	-- Handle close button
+	closeButton.MouseButton1Click:Connect(function()
+		background.Visible = false
+	end)
+
+	-- Handle toggle button
+	toggleButton.MouseButton1Click:Connect(function()
+		background.Visible = not background.Visible
+	end)
+
+	-- Handle refresh button
+	refreshButton.MouseButton1Click:Connect(function()
+		updateDashboard(scrollFrame)
+	end)
+
+	-- Parent the GUI to the player
+	gui.Parent = player.PlayerGui
+
+	return scrollFrame
 end
 
 -- Start the dashboard update loop
