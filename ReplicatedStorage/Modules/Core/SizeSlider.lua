@@ -18,7 +18,7 @@ local player = Players.LocalPlayer
 local debugSystem = "SizeSlider" -- System name for debug logs
 
 -- Configuration
-SizeSlider.DetentValues = {0.25, 0.5, 0.75, 1, 2, 4, 8}
+SizeSlider.DetentValues = {0.25, 0.5, 0.75, 1, 2, 3, 4}
 SizeSlider.DefaultSizeIndex = 4 -- Index for size 1 (normal)
 
 -- Variables

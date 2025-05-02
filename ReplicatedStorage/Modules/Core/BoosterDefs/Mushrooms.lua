@@ -14,7 +14,7 @@ local MushroomBooster = {}
 
 -- Define properties
 MushroomBooster.name = "Shrooms"
-MushroomBooster.description = "+1% jump height for 1 minute per mushroom."
+MushroomBooster.description = "+1.0 jump height for 1 minute per mushroom."
 MushroomBooster.imageId = "rbxassetid://134097767361051"
 MushroomBooster.boosterType = "PlayerBoost" -- Will be mapped to Boosters.BoosterTypes.PLAYER
 MushroomBooster.duration = 60 -- 60 seconds per mushroom
@@ -27,13 +27,12 @@ MushroomBooster.calculateEffect = function(spendingAmount)
 		return "Select mushrooms to use"
 	end
 
-	local jumpBoost = spendingAmount * 0.01 -- 1% per mushroom
-	local percentDisplay = math.round(jumpBoost * 100) -- Use math.round() for clean percentage display
+	local heightBoost = spendingAmount * 1.0 -- +1.0 stud per mushroom
 	local totalDuration = MushroomBooster.duration * spendingAmount -- Use the self-referenced duration property
 	local timeText = Utility.FormatTimeDuration(totalDuration)
 
 	local pluralText = spendingAmount > 1 and "mushrooms" or "mushroom"
-	return "+" .. percentDisplay .. "% jump height for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. "."
+	return "+" .. heightBoost .. " jump height for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. "."
 end
 
 -- Function that runs when booster is activated
@@ -52,25 +51,28 @@ MushroomBooster.onActivate = function(player, qty)
 	local originalJumpHeight = humanoid.JumpHeight
 	local originalJumpPower = humanoid.JumpPower
 
-	-- Calculate percentage boost (1% per mushroom used)
-	local percentBoost = qty * 0.01 -- 1% per mushroom
+	-- Calculate fixed height boost (+1.0 stud per mushroom)
+	local heightBoost = qty * 1.0 -- +1.0 stud per mushroom
+	local newJumpHeight = originalJumpHeight + heightBoost
+
+	-- Calculate the appropriate jump power using the physics formula: JumpPower = sqrt(2 * gravity * jumpHeight)
+	local gravity = workspace.Gravity
+	local newJumpPower = math.sqrt(2 * gravity * newJumpHeight)
 
 	-- Apply jump boost based on rig type
 	if humanoid.RigType == Enum.HumanoidRigType.R15 then
-		-- For R15 characters, primarily use JumpHeight
-		humanoid.JumpHeight = originalJumpHeight * (1 + percentBoost)
-
-		-- Also set JumpPower as a fallback
-		humanoid.JumpPower = originalJumpPower * (1 + percentBoost)
+		-- For R15 characters, set both JumpHeight and JumpPower
+		humanoid.JumpHeight = newJumpHeight
+		humanoid.JumpPower = newJumpPower
 	else
 		-- For R6 characters, only use JumpPower
-		humanoid.JumpPower = originalJumpPower * (1 + percentBoost)
+		humanoid.JumpPower = newJumpPower
 	end
 
 	-- Print feedback
 	print("Activated Mushroom booster for " .. player.Name .. ": +" .. 
-		math.floor(percentBoost * 100) .. "% jump boost for " .. 
-		(qty * MushroomBooster.duration) .. " seconds")
+		heightBoost .. " jump height boost (to " .. newJumpHeight .. 
+		" studs) for " .. (qty * MushroomBooster.duration) .. " seconds")
 
 	-- Create a timer to track duration and handle effect removal
 	local timerName = "Mushrooms"
@@ -129,10 +131,10 @@ MushroomBooster.onActivate = function(player, qty)
 		-- Re-apply the jump boost to the new character
 		if newHumanoid then
 			if newHumanoid.RigType == Enum.HumanoidRigType.R15 then
-				newHumanoid.JumpHeight = originalJumpHeight * (1 + percentBoost)
-				newHumanoid.JumpPower = originalJumpPower * (1 + percentBoost)
+				newHumanoid.JumpHeight = newJumpHeight
+				newHumanoid.JumpPower = newJumpPower
 			else
-				newHumanoid.JumpPower = originalJumpPower * (1 + percentBoost)
+				newHumanoid.JumpPower = newJumpPower
 			end
 		end
 	end)
