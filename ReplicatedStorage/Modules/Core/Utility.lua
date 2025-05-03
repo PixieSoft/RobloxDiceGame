@@ -47,7 +47,7 @@ function Utility.FormatTimeDuration(seconds)
 end
 
 -- Debug logging function that checks if a system's debug flag is enabled before logging
--- @param System (string) - The system name to check in ReplicatedStorage/Debug
+-- @param System (string) - The system name to check in ReplicatedStorage/Debug (anywhere in the hierarchy)
 -- @param Severity (string) - The severity level: "info", "warn", or "err"
 -- @param Text (string) - The message to output
 function Utility.Log(System, Severity, Text)
@@ -60,9 +60,17 @@ function Utility.Log(System, Severity, Text)
 		return
 	end
 
-	-- Check if the system's debug flag exists and is enabled
-	local SystemFlag = DebugFolder:FindFirstChild(System)
-	if not SystemFlag or not SystemFlag:IsA("BoolValue") or not SystemFlag.Value then
+	-- Find the first BoolValue with matching name anywhere in the Debug folder hierarchy
+	local SystemFlag
+	for _, descendant in ipairs(DebugFolder:GetDescendants()) do
+		if descendant:IsA("BoolValue") and descendant.Name == System then
+			SystemFlag = descendant
+			break
+		end
+	end
+
+	-- If flag doesn't exist or is disabled, don't log
+	if not SystemFlag or not SystemFlag.Value then
 		return
 	end
 

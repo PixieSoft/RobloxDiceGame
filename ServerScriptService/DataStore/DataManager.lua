@@ -37,14 +37,14 @@ function DataManager.OnPlayerAdded(Player)
 		tostring(Player.UserId),
 		"ForceLoad"
 	)
-	
+
 	--// Load Profile
 	if Profile then
 		Profile:ListenToRelease(function()
 			Profiles[Player] = nil
 			Player:Kick()
 		end)
-		
+
 		if Player:IsDescendantOf(Players) then			
 			local Data = Profile.Data
 
@@ -67,7 +67,7 @@ function DataManager.OnPlayerAdded(Player)
 					end
 				end
 			end
-			
+
 			Profiles[Player] = Profile
 		else
 			Profile:Release()
@@ -75,10 +75,10 @@ function DataManager.OnPlayerAdded(Player)
 	else
 		Player:Kick()
 	end
-	
+
 	--// Create TempValues
 	local TempFolder = CreateInstance("Folder", "TempValues", Player)
-	
+
 	for _, TempInfo in TempValues do
 		CreateInstance(TempInfo.Type, TempInfo.Name, TempFolder, TempInfo.StartingAmount)
 	end
@@ -86,7 +86,7 @@ end
 
 function DataManager.OnPlayerRemoving(Player)
 	local Profile = Profiles[Player]
-	
+
 	if Profile then
 		Profile.Data.Other.LastJoin = os.time()
 		Profile:Release()
@@ -95,7 +95,7 @@ end
 
 function DataManager:Get(Player)
 	local Profile = Profiles[Player]
-	
+
 	if Profile then
 		return Profile.Data
 	end
@@ -103,9 +103,9 @@ end
 
 function DataManager:CreateFolder(Player) -- converts a profile to a folder
 	local Data = DataManager:Get(Player)
-	
+
 	local DataFolder = CreateInstance("Folder", Player.Name, ReplicatedStorage.Data)
-	
+
 	local function CreateValue(Name, Parent, Value)
 		if type(Value) == "number" then
 			return CreateInstance("NumberValue", Name, Parent, Value)
@@ -115,15 +115,15 @@ function DataManager:CreateFolder(Player) -- converts a profile to a folder
 			return CreateInstance("BoolValue", Name, Parent, Value)
 		end
 	end
-	
+
 	for Object, ObjectValue in Data do
 		if type(ObjectValue) == "table" then
 			CreateInstance("Folder", Object, DataFolder)
-			
+
 			for Object2, ObjectValue2 in ObjectValue do -- loop thru this folder for the second layer
 				if type(ObjectValue2) == "table" then
 					CreateInstance("Folder", Object2, DataFolder[Object])
-					
+
 					for Object3, ObjectValue3 in ObjectValue2 do
 						CreateValue(Object3, DataFolder[Object][Object2], ObjectValue3)
 					end					
@@ -135,18 +135,18 @@ function DataManager:CreateFolder(Player) -- converts a profile to a folder
 			CreateValue(Object, DataFolder, ObjectValue) -- its a value directly inside data, so save
 		end
 	end
-	
+
 	return DataFolder
 end
 
 function DataManager:FolderToProfile(Player)
 	local DataFolder = ReplicatedStorage.Data[Player.Name]
 	local Data = DataManager:Get(Player)
-	
+
 	for _, Object in DataFolder:GetChildren() do
 		if Object:IsA("Folder") then
-			Data[Object.Name] = {}
-			
+			Data[Object.Name] = {} -- attempted to index nil with boosters
+
 			for _, ObjectInside in Object:GetChildren() do -- if its a folder, get the things inside
 				if ObjectInside:IsA("Folder") then -- for example the pets
 					Data[Object.Name][ObjectInside.Name] = {}

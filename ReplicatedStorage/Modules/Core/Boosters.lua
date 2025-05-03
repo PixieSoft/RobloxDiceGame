@@ -345,34 +345,65 @@ if IsServer then
 
 	-- Function to check if a specific booster is active
 	function Boosters.IsBoosterActive(player, boosterName)
-		if not player or not player.UserId or not Boosters.ActiveBoosters[player.UserId] or
-			not Boosters.ActiveBoosters[player.UserId][boosterName] then
+		if not player or not player.UserId then
 			return false
 		end
 
-		local timeLeft = Boosters.ActiveBoosters[player.UserId][boosterName].expirationTime - os.time()
-		return timeLeft > 0
-	end
-
-	-- Cleanup function for when player leaves
-	function Boosters.CleanupPlayerBoosters(player)
-		if not player or not player.UserId or not Boosters.ActiveBoosters[player.UserId] then
-			return
-		end
-
-		for boosterName, boosterData in pairs(Boosters.ActiveBoosters[player.UserId]) do
-			if boosterData.cleanup and type(boosterData.cleanup) == "function" then
-				local success, errorMsg = pcall(function()
-					boosterData.cleanup()
-				end)
-
-				if not success then
-					warn("Error in cleanup function for booster", boosterName, ":", errorMsg)
+		-- First check via stats - this is more reliable than the in-memory tracking
+		-- which could get out of sync after server restarts or code updates
+		local Stat = require(game.ReplicatedStorage.Stat)
+		if Stat.WaitForLoad(player) then
+			local playerData = Stat.GetDataFolder(player)
+			if playerData then
+				local boostersFolder = playerData:FindFirstChild("Boosters")
+				if boostersFolder then
+					local activeState = boostersFolder:FindFirstChild(boosterName .. "Active")
+					if activeState and activeState:IsA("BoolValue") then
+						return activeState.Value
+					end
 				end
 			end
 		end
 
-		Boosters.ActiveBoosters[player.UserId] = nil
+		-- Fall back to the in-memory tracking if stat check didn't find anything
+		if not Boosters.ActiveBoosters[player.UserId] or
+			not Boosters.ActiveBoosters[player.UserId][boosterName] then
+			return false
+		end
+
+		-- Check if the booster has expired
+		local currentTime = os.time()
+		local boosterData = Boosters.ActiveBoosters[player.UserId][boosterName]
+		local timeLeft = boosterData.expirationTime - currentTime
+
+		-- If the booster has expired but wasn't properly cleaned up, clean it up now
+		if timeLeft <= 0 then
+			-- Clean up expired booster entry
+			if boosterData.cleanup and type(boosterData.cleanup) == "function" then
+				pcall(boosterData.cleanup)
+			end
+
+			-- Remove from active boosters
+			Boosters.ActiveBoosters[player.UserId][boosterName] = nil
+
+			-- Update the active status stat if it exists
+			if Stat.WaitForLoad(player) then
+				local playerData = Stat.GetDataFolder(player)
+				if playerData then
+					local boostersFolder = playerData:FindFirstChild("Boosters")
+					if boostersFolder then
+						local activeState = boostersFolder:FindFirstChild(boosterName .. "Active")
+						if activeState and activeState:IsA("BoolValue") then
+							activeState.Value = false
+						end
+					end
+				end
+			end
+
+			return false
+		end
+
+		return true
 	end
 
 	-- Create necessary events when module is loaded

@@ -75,8 +75,11 @@ local function ensureStats(player)
 	return true
 end
 
--- Remote event for showing/hiding the size slider
+-- Get or create the size slider event (once, cached)
+local sliderEvent
 local function getOrCreateSliderEvent()
+	if sliderEvent then return sliderEvent end
+
 	local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
 	if not eventsFolder then
 		eventsFolder = Instance.new("Folder")
@@ -93,7 +96,7 @@ local function getOrCreateSliderEvent()
 		Utility.Log(debugSystem, "info", "Created Core folder in Events")
 	end
 
-	local sliderEvent = coreFolder:FindFirstChild("SizeSliderVisibility")
+	sliderEvent = coreFolder:FindFirstChild("SizeSliderVisibility")
 	if not sliderEvent then
 		sliderEvent = Instance.new("RemoteEvent")
 		sliderEvent.Name = "SizeSliderVisibility"
@@ -138,12 +141,18 @@ CrystalBooster.onActivate = function(player, qty)
 	-- Calculate duration
 	local totalDuration = qty * CrystalBooster.duration
 
-	-- Set the crystal active status
+	-- Set the crystal active status (important for IsBoosterActive function)
 	crystalsActiveStat.Value = true
 
 	-- Show the size slider
 	Utility.Log(debugSystem, "info", "Firing SizeSliderVisibility event with value true to show slider")
-	sliderEvent:FireClient(player, true)
+	local success, err = pcall(function()
+		sliderEvent:FireClient(player, true)
+	end)
+
+	if not success then
+		Utility.Log(debugSystem, "warn", "Failed to show slider: " .. tostring(err))
+	end
 
 	Utility.Log(debugSystem, "info", "Crystal booster activated for " .. player.Name .. ": Active for " .. totalDuration .. " seconds")
 
@@ -157,17 +166,23 @@ CrystalBooster.onActivate = function(player, qty)
 		end,
 
 		onComplete = function(timer)
-			-- Hide the size slider
-			Utility.Log(debugSystem, "info", "Firing SizeSliderVisibility event with value false to hide slider (onComplete)")
-			sliderEvent:FireClient(player, false)
-
-			-- Reset character to default size (1.0)
-			ScaleCharacter.SetScale(player, 1.0)
-
-			-- Set crystal active status to false when timer completes
+			-- First update the active status in the stats (do this FIRST to fix the "already active" bug)
 			if crystalsActiveStat then
 				crystalsActiveStat.Value = false
 			end
+
+			-- Hide the size slider
+			Utility.Log(debugSystem, "info", "Firing SizeSliderVisibility event with value false to hide slider (onComplete)")
+			local hideSuccess, hideErr = pcall(function()
+				sliderEvent:FireClient(player, false)
+			end)
+
+			if not hideSuccess then
+				Utility.Log(debugSystem, "warn", "Failed to hide slider in onComplete: " .. tostring(hideErr))
+			end
+
+			-- Reset character to default size (1.0)
+			ScaleCharacter.SetScale(player, 1.0)
 
 			Utility.Log(debugSystem, "info", "Crystal effect expired for " .. player.Name)
 		end,
@@ -181,17 +196,23 @@ CrystalBooster.onActivate = function(player, qty)
 		end,
 
 		onCancel = function(timer)
-			-- Hide the size slider
-			Utility.Log(debugSystem, "info", "Firing SizeSliderVisibility event with value false to hide slider (onCancel)")
-			sliderEvent:FireClient(player, false)
-
-			-- Reset character to default size (1.0)
-			ScaleCharacter.SetScale(player, 1.0)
-
-			-- Set crystal active status to false if timer is canceled
+			-- First update the active status in the stats (do this FIRST to fix the "already active" bug)
 			if crystalsActiveStat then
 				crystalsActiveStat.Value = false
 			end
+
+			-- Hide the size slider
+			Utility.Log(debugSystem, "info", "Firing SizeSliderVisibility event with value false to hide slider (onCancel)")
+			local hideSuccess, hideErr = pcall(function()
+				sliderEvent:FireClient(player, false)
+			end)
+
+			if not hideSuccess then
+				Utility.Log(debugSystem, "warn", "Failed to hide slider in onCancel: " .. tostring(hideErr))
+			end
+
+			-- Reset character to default size (1.0)
+			ScaleCharacter.SetScale(player, 1.0)
 
 			Utility.Log(debugSystem, "info", "Crystal effect canceled for " .. player.Name)
 		end,
@@ -219,7 +240,7 @@ CrystalBooster.onActivate = function(player, qty)
 		Utility.Log(debugSystem, "warn", "Failed to create timer for " .. player.Name)
 		return function() end
 	end
-	
+
 	-- Add this line to store the crystal count
 	Timers.SetCustomValue(player, timerName, "Count", qty, "IntValue")
 
@@ -232,9 +253,20 @@ CrystalBooster.onActivate = function(player, qty)
 
 		Utility.Log(debugSystem, "info", "Cleanup function called for Crystal booster")
 
+		-- First update the active status in the stats (do this FIRST to fix the "already active" bug)
+		if crystalsActiveStat then
+			crystalsActiveStat.Value = false
+		end
+
 		-- Hide the size slider
 		Utility.Log(debugSystem, "info", "Firing SizeSliderVisibility event with value false to hide slider (cleanup)")
-		sliderEvent:FireClient(player, false)
+		local hideSuccess, hideErr = pcall(function()
+			sliderEvent:FireClient(player, false)
+		end)
+
+		if not hideSuccess then
+			Utility.Log(debugSystem, "warn", "Failed to hide slider in cleanup: " .. tostring(hideErr))
+		end
 
 		-- Reset character to default size (1.0)
 		ScaleCharacter.SetScale(player, 1.0)
@@ -244,14 +276,8 @@ CrystalBooster.onActivate = function(player, qty)
 			Timers.CancelTimer(player, timerName)
 		end
 
-		-- Set crystal active status to false
-		if crystalsActiveStat then
-			crystalsActiveStat.Value = false
-		end
-
 		Utility.Log(debugSystem, "info", "Crystal booster cleanup function called for " .. player.Name)
 	end
 end
 
 return CrystalBooster
--- /ReplicatedStorage/Modules/Core/BoosterDefs/Crystals.lua

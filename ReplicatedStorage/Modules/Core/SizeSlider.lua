@@ -31,6 +31,7 @@ local handleOriginalPosition = nil
 local trackWidth = nil
 local detentPositions = {}
 local isInitialized = false
+local isSliderVisible = false
 
 -- Helper function to calculate positions for each detent on the slider track
 local function calculateDetentPositions()
@@ -133,6 +134,9 @@ function SizeSlider.Reset()
 			sliderUI.ValueText.Text = tostring(SizeSlider.DetentValues[currentSizeIndex]) .. "x"
 		end
 	end
+
+	-- Apply the default scale
+	ScaleCharacter.SetScale(player, SizeSlider.DetentValues[currentSizeIndex])
 end
 
 -- Initialize the slider UI
@@ -284,11 +288,16 @@ function SizeSlider.Initialize(sliderFrame)
 
 		sliderEvent.OnClientEvent:Connect(function(visible)
 			Utility.Log(debugSystem, "info", "Received visibility event with value: " .. tostring(visible))
-			SizeSlider.SetVisible(visible)
-			if visible == false then
-				-- Reset to default size when hiding
+			-- Store current visibility (for debugging)
+			local previousVisibility = isSliderVisible
+			Utility.Log(debugSystem, "info", "Changing visibility from " .. tostring(previousVisibility) .. " to " .. tostring(visible))
+
+			if visible == false and isSliderVisible == true then
+				-- Only reset to default size when hiding
 				SizeSlider.Reset()
 			end
+
+			SizeSlider.SetVisible(visible)
 		end)
 	end
 
@@ -296,6 +305,7 @@ function SizeSlider.Initialize(sliderFrame)
 
 	-- Hide slider by default
 	sliderUI.Visible = false
+	isSliderVisible = false
 	Utility.Log(debugSystem, "info", "Slider initialized and hidden by default")
 
 	isInitialized = true
@@ -329,6 +339,7 @@ function SizeSlider.SetVisible(visible)
 
 	if sliderUI then
 		sliderUI.Visible = visible
+		isSliderVisible = visible
 		Utility.Log(debugSystem, "info", "Slider visibility set to " .. tostring(visible))
 
 		if visible == true then
@@ -338,6 +349,11 @@ function SizeSlider.SetVisible(visible)
 	else
 		Utility.Log(debugSystem, "warn", "sliderUI is nil, cannot set visibility")
 	end
+end
+
+-- Get slider visibility state
+function SizeSlider.IsVisible()
+	return isSliderVisible
 end
 
 -- For client-side initialization
@@ -406,4 +422,3 @@ if RunService:IsClient() then
 end
 
 return SizeSlider
--- /ReplicatedStorage/Modules/Core/SizeSlider.lua

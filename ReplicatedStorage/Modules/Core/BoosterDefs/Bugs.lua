@@ -78,7 +78,7 @@ BugsBooster.onActivate = function(player, qty)
 	end)
 
 	-- Create timer with callbacks
-	local timerName = "BugsBoost"
+	local timerName = "Bugs"
 	local totalDuration = qty * BugsBooster.duration
 
 	local callbacks = {
