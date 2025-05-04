@@ -1,5 +1,5 @@
 -- /ServerScriptService/BoosterSystem/BoosterServerHandler.lua
--- Script that handles server-side booster usage and activation requests
+-- Script that handles server-side booster request validation and inventory management
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -15,28 +15,16 @@ if not boosterEvents then
 	boosterEvents.Name = "BoosterEvents"
 	boosterEvents.Parent = ReplicatedStorage
 
-	-- Create standard events
-	local events = {
-		"BoosterActivated",
-		"BoosterDeactivated",
-		"UseBooster"
-	}
-
-	for _, eventName in ipairs(events) do
-		if not boosterEvents:FindFirstChild(eventName) then
-			local event = Instance.new("RemoteEvent")
-			event.Name = eventName
-			event.Parent = boosterEvents
-		end
-	end
+	-- Create the UseBooster event (this is the only event we need here)
+	local useBoosterEvent = Instance.new("RemoteEvent")
+	useBoosterEvent.Name = "UseBooster"
+	useBoosterEvent.Parent = boosterEvents
 end
 
 -- Get the UseBooster event
 local useBoosterEvent = boosterEvents:FindFirstChild("UseBooster")
 if not useBoosterEvent then
-	useBoosterEvent = Instance.new("RemoteEvent")
-	useBoosterEvent.Name = "UseBooster"
-	useBoosterEvent.Parent = boosterEvents
+	error("UseBooster event not found")
 end
 
 -- Handle player's request to use a booster
@@ -67,60 +55,18 @@ useBoosterEvent.OnServerEvent:Connect(function(player, boosterName, quantity)
 		return
 	end
 
-	-- Get the booster item
-	local boosterItem = Boosters.Items[boosterName]
-	if not boosterItem then
-		warn("Booster item not found in Boosters.Items: " .. boosterName)
-		return
-	end
+	-- Deduct boosters from player's count
+	-- Only deduct after validation passes
+	boosterStat.Value = boosterStat.Value - quantity
 
-	-- Check if this booster can be activated
-	local canActivate = true
+	-- Use the centralized booster activation system
+	local success = Boosters.UseBooster(player, boosterName, quantity)
 
-	-- Check if this booster is already active for this player
-	if Boosters.IsBoosterActive and Boosters.IsBoosterActive(player, boosterName) then
-		warn("Booster already active: " .. boosterName)
-		canActivate = false
-		return
-	end
-
-	-- Only proceed if we can activate the booster
-	if canActivate then
-		-- Deduct boosters from player's count
-		boosterStat.Value = boosterStat.Value - quantity
-
-		-- Run the booster's onActivate function
-		if type(boosterItem.onActivate) == "function" then
-			local success, cleanupFunction = pcall(function()
-				return boosterItem.onActivate(player, quantity)
-			end)
-
-			if success then
-				-- Delegate activation management to the Boosters module
-				if Boosters.ActivateBooster then
-					-- Use the centralized Boosters system to handle activation
-					local activationSuccess = Boosters.ActivateBooster(player, boosterName, quantity, cleanupFunction)
-					
-					-- If activation failed, refund the boosters
-					if not activationSuccess then
-						warn("Failed to activate " .. boosterName .. " through Boosters.ActivateBooster")
-						boosterStat.Value = boosterStat.Value + quantity
-					end
-				end
-			else
-				-- If activation failed, refund the booster
-				warn("Failed to activate booster " .. boosterName .. ": " .. tostring(cleanupFunction))
-				boosterStat.Value = boosterStat.Value + quantity
-			end
-		else
-			-- If there's no activation function, refund the booster
-			warn("Booster " .. boosterName .. " doesn't have an onActivate function")
-			boosterStat.Value = boosterStat.Value + quantity
-		end
+	-- If activation failed, refund the boosters
+	if not success then
+		warn("Failed to activate " .. boosterName .. ", refunding boosters")
+		boosterStat.Value = boosterStat.Value + quantity
 	end
 end)
-
--- Note: Player cleanup is now fully handled by the Boosters module
--- We no longer need duplicate cleanup code here
 
 print("BoosterServerHandler initialized")

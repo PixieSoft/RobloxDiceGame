@@ -9,17 +9,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
--- Check if this is running on the server or client
+-- Check if this is running on the server or client  
 local IsServer = RunService:IsServer()
-
-local function getBoosterNameFromFunction(func)
-	for name, item in pairs(Boosters.Items) do
-		if item.onActivate == func then
-			return name
-		end
-	end
-	return "unknown booster"
-end
 
 -- Booster Types for categorization
 Boosters.BoosterTypes = {
@@ -67,48 +58,12 @@ local function loadBoosterModules()
 		return
 	end
 
-	-- Debug: Print the full path to the Boosters folder
-	print("DEBUG - Loading booster modules from:", BOOSTERS_PATH:GetFullName())
-
-	-- Debug: Check if the folder exists and what's in it
-	if BOOSTERS_PATH then
-		print("DEBUG - Boosters folder exists with " .. #BOOSTERS_PATH:GetChildren() .. " children")
-		for i, child in ipairs(BOOSTERS_PATH:GetChildren()) do
-			print("DEBUG - Child #" .. i .. ": " .. child.Name .. " (" .. child.ClassName .. ")")
-		end
-	else
-		print("DEBUG - Boosters folder not found!")
-	end
-
-	-- Debug: Check specifically for Crystals module
-	local crystalsModule = BOOSTERS_PATH and BOOSTERS_PATH:FindFirstChild("Crystals")
-	if crystalsModule then
-		print("DEBUG - Crystals module found! Attempting to load...")
-	else
-		print("DEBUG - Crystals module NOT found in Boosters folder!")
-	end
-
 	-- Iterate through all modules in the Boosters folder
 	for _, module in pairs(BOOSTERS_PATH:GetChildren()) do
 		if module:IsA("ModuleScript") then
 			local boosterName = module.Name
-			print("Loading booster module:", boosterName)
-
-			-- Debug: More verbose loading process
-			print("DEBUG - Attempting to load " .. boosterName .. "...")
-			local success = loadBooster(boosterName, module)
-			if success then
-				print("DEBUG - Successfully loaded " .. boosterName .. "!")
-			else
-				print("DEBUG - Failed to load " .. boosterName .. "!")
-			end
+			loadBooster(boosterName, module)
 		end
-	end
-
-	-- Debug: Print all loaded boosters
-	print("DEBUG - Loaded boosters in Boosters.Items:")
-	for name, _ in pairs(Boosters.Items) do
-		print("DEBUG - - " .. name)
 	end
 
 	-- Print summary of loaded boosters
@@ -119,32 +74,71 @@ local function loadBoosterModules()
 	print("Total boosters loaded:", boosterCount)
 end
 
--- Define boosters that haven't been moved to their own modules yet
--- These will be combined with the dynamically loaded boosters
-local function defineBuiltInBoosters()
-	-- All boosters have been moved to their own modules!
-	-- This function is now empty but kept for future expansions
-end
-
--- Print the current module loading status
-print("Initializing Boosters module...")
-
 -- Initialize the boosters
-defineBuiltInBoosters()
 loadBoosterModules()
-
--- Print the number of booster types loaded
-local boosterCount = 0
-for name, _ in pairs(Boosters.Items) do
-	boosterCount = boosterCount + 1
-	print("Loaded booster: " .. name)
-end
-print("Total boosters loaded: " .. boosterCount)
 
 -- Only run server-side functionality if we're on the server
 if IsServer then
 	-- Active boosters storage
 	Boosters.ActiveBoosters = {}
+
+	-- Centralized Slider Visibility Control Function
+	function Boosters.SetSizeSliderVisibility(player, visible)
+		-- Load Utility for debug logging
+		local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+		local debugSystem = "Boosters"
+
+		-- Ensure remote event exists
+		local sizeSliderEvent = Boosters.GetSizeSliderEvent()
+
+		if not sizeSliderEvent then
+			Utility.Log(debugSystem, "warn", "Failed to get size slider event")
+			return false
+		end
+
+		-- Fire the visibility change event to the client
+		Utility.Log(debugSystem, "info", "Attempting to fire size slider visibility event to " .. player.Name .. " with value: " .. tostring(visible))
+
+		local success, err = pcall(function()
+			sizeSliderEvent:FireClient(player, visible)
+		end)
+
+		if success then
+			Utility.Log(debugSystem, "info", "Successfully fired size slider visibility event to " .. player.Name .. " with value: " .. tostring(visible))
+		else
+			Utility.Log(debugSystem, "warn", "Failed to fire size slider visibility event: " .. tostring(err))
+			return false
+		end
+
+		return true
+	end
+
+	-- Helper function to get or create the size slider event
+	function Boosters.GetSizeSliderEvent()
+		local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
+		if not eventsFolder then
+			eventsFolder = Instance.new("Folder")
+			eventsFolder.Name = "Events"
+			eventsFolder.Parent = ReplicatedStorage
+		end
+
+		local coreFolder = eventsFolder:FindFirstChild("Core")
+		if not coreFolder then
+			coreFolder = Instance.new("Folder")
+			coreFolder.Name = "Core"
+			coreFolder.Parent = eventsFolder
+		end
+
+		local sizeSliderEvent = coreFolder:FindFirstChild("SizeSliderVisibility")
+		if not sizeSliderEvent then
+			sizeSliderEvent = Instance.new("RemoteEvent")
+			sizeSliderEvent.Name = "SizeSliderVisibility"
+			sizeSliderEvent.Parent = coreFolder
+			print("[Boosters] Created SizeSliderVisibility RemoteEvent")
+		end
+
+		return sizeSliderEvent
+	end
 
 	-- Function to ensure all booster stats exist for a player
 	function Boosters.EnsureBoosterStats(player)
@@ -181,35 +175,56 @@ if IsServer then
 				newStat.Name = boosterName
 				newStat.Value = 0 -- Start with 0 boosters
 				newStat.Parent = boostersFolder
-
-				print("Created stat for booster: " .. boosterName)
 			end
 		end
 
 		return true
 	end
 
-	-- Function to activate a booster for a player
-	function Boosters.ActivateBooster(player, boosterName, quantity, cleanupFunction)
-		-- Default quantity to 1 if not provided
-		quantity = quantity or 1
+	-- Central function to activate a booster for a player
+	function Boosters.UseBooster(player, boosterName, quantity)
+		-- Load Timers module
+		local Timers = require(ReplicatedStorage.Modules.Core.Timers)
 
+		-- Get booster configuration
 		local booster = Boosters.Items[boosterName]
 		if not booster then
-			warn("Attempted to activate unknown booster:", boosterName)
+			warn("Attempted to use unknown booster:", boosterName)
 			return false
 		end
 
-		-- Initialize player's active boosters table if not exists
-		if not Boosters.ActiveBoosters[player.UserId] then
-			Boosters.ActiveBoosters[player.UserId] = {}
-		end
-
-		-- Check if this booster is already active
-		-- For all boosters (even those with stacks=true), prevent re-activation while active
-		if Boosters.ActiveBoosters[player.UserId][boosterName] then
+		-- Check if this booster is already active using the Timers system
+		if Timers.TimerExists(player, boosterName) then
 			warn("Cannot activate booster while already active:", boosterName)
 			return false
+		end
+
+		-- Call the booster's onActivate function to apply effects
+		local cleanupFunction
+		if type(booster.onActivate) == "function" then
+			local success, result = pcall(function()
+				return booster.onActivate(player, quantity)
+			end)
+
+			if success then
+				cleanupFunction = result
+			else
+				warn("Failed to activate booster " .. boosterName .. ": " .. tostring(result))
+				return false
+			end
+		else
+			warn("Booster " .. boosterName .. " doesn't have an onActivate function")
+			return false
+		end
+
+		-- Make sure cleanupFunction is actually a function
+		if type(cleanupFunction) ~= "function" then
+			cleanupFunction = function() end
+		end
+
+		-- Handle size slider visibility for Crystals
+		if boosterName == "Crystals" then
+			Boosters.SetSizeSliderVisibility(player, true)
 		end
 
 		-- Calculate total duration (base duration * quantity)
@@ -218,9 +233,9 @@ if IsServer then
 		-- Store the active booster with its expiration time and cleanup function
 		local expirationTime = os.time() + totalDuration
 
-		-- Make sure cleanupFunction is actually a function or set it to an empty function
-		if type(cleanupFunction) ~= "function" then
-			cleanupFunction = function() end
+		-- Initialize player's active boosters table if not exists
+		if not Boosters.ActiveBoosters[player.UserId] then
+			Boosters.ActiveBoosters[player.UserId] = {}
 		end
 
 		Boosters.ActiveBoosters[player.UserId][boosterName] = {
@@ -228,10 +243,47 @@ if IsServer then
 			cleanup = cleanupFunction
 		}
 
-		-- Setup expiration timer with the total duration
-		task.delay(totalDuration, function()
-			Boosters.DeactivateBooster(player, boosterName)
-		end)
+		-- Create a timer to manage the booster
+		local callbacks = {
+			onTick = function(timer)
+				-- Optional: Update UI or other systems
+			end,
+
+			onComplete = function(timer)
+				-- Hide size slider before running cleanup
+				if boosterName == "Crystals" then
+					Boosters.SetSizeSliderVisibility(player, false)
+				end
+
+				-- Run cleanup when timer completes  
+				Boosters.DeactivateBooster(player, boosterName)
+			end,
+
+			onCancel = function(timer)
+				-- Hide size slider before running cleanup
+				if boosterName == "Crystals" then
+					Boosters.SetSizeSliderVisibility(player, false)
+				end
+
+				-- Run cleanup when timer is canceled
+				Boosters.DeactivateBooster(player, boosterName)
+			end,
+
+			onStart = function(timer)
+				-- Optional: Initialize any effects when timer starts
+			end
+		}
+
+		-- Create the timer - this is the single source of truth for activation status
+		local timer = Timers.CreateTimer(player, boosterName, totalDuration, callbacks)
+
+		if not timer then
+			warn("Failed to create timer for " .. boosterName)
+			return false
+		end
+
+		-- Store the quantity as custom value in the timer
+		Timers.SetCustomValue(player, boosterName, "Count", quantity, "IntValue")
 
 		-- Fire event for UI updates or other systems
 		local BoosterEvents = game.ReplicatedStorage:FindFirstChild("BoosterEvents")
@@ -245,45 +297,10 @@ if IsServer then
 		return true
 	end
 
-	-- Function to give booster items to a player
-	function Boosters.GiveBooster(player, boosterName, amount)
-		amount = amount or 1
-
-		if not Boosters.Items[boosterName] then
-			warn("Attempted to give unknown booster:", boosterName)
-			return false
-		end
-
-		local Stat = require(game.ReplicatedStorage.Stat)
-		local boosterStat = Stat.Get(player, boosterName)
-
-		if not boosterStat then
-			-- Try to create the stat if it doesn't exist
-			Boosters.EnsureBoosterStats(player)
-			boosterStat = Stat.Get(player, boosterName)
-
-			if not boosterStat then
-				warn("Could not create or find booster stat:", boosterName)
-				return false
-			end
-		end
-
-		boosterStat.Value = boosterStat.Value + amount
-		return true
-	end
-
 	-- Function to deactivate a booster
 	function Boosters.DeactivateBooster(player, boosterName)
 		if not Boosters.ActiveBoosters[player.UserId] or
 			not Boosters.ActiveBoosters[player.UserId][boosterName] then
-			return false
-		end
-
-		local booster = Boosters.Items[boosterName]
-		if not booster then return false end
-
-		if not booster.canCancel and os.time() < Boosters.ActiveBoosters[player.UserId][boosterName].expirationTime then
-			-- Cannot cancel non-cancelable boosters before they expire
 			return false
 		end
 
@@ -313,103 +330,103 @@ if IsServer then
 		return true
 	end
 
-	-- Function to get remaining time for an active booster
-	function Boosters.GetRemainingTime(player, boosterName)
-		if not Boosters.ActiveBoosters[player.UserId] or
-			not Boosters.ActiveBoosters[player.UserId][boosterName] then
-			return 0
+	-- Function to check if a specific booster is active
+	function Boosters.IsBoosterActive(player, boosterName)
+		-- Load Timers module
+		local Timers = require(ReplicatedStorage.Modules.Core.Timers)
+
+		if not player or not player.UserId then
+			return false
 		end
 
-		local timeLeft = Boosters.ActiveBoosters[player.UserId][boosterName].expirationTime - os.time()
-		return math.max(0, timeLeft)
+		-- Simply use Timers system to check if timer exists
+		return Timers.TimerExists(player, boosterName)
+	end
+
+	-- Function to get remaining time for a booster
+	function Boosters.GetRemainingTime(player, boosterName)
+		-- Load Timers module
+		local Timers = require(ReplicatedStorage.Modules.Core.Timers)
+
+		-- Use Timers system to get remaining time
+		return Timers.GetTimeRemaining(player, boosterName)
 	end
 
 	-- Function to get all active boosters for a player
 	function Boosters.GetActiveBoosters(player)
-		if not player or not player.UserId or not Boosters.ActiveBoosters[player.UserId] then
+		-- Load Timers module
+		local Timers = require(ReplicatedStorage.Modules.Core.Timers)
+
+		if not player or not player.UserId then
 			return {}
 		end
 
 		local result = {}
-		local currentTime = os.time()
 
-		for boosterName, boosterData in pairs(Boosters.ActiveBoosters[player.UserId]) do
-			local timeLeft = boosterData.expirationTime - currentTime
-			if timeLeft > 0 then
-				result[boosterName] = timeLeft
+		-- Get all active timers related to boosters
+		local allTimers = Timers.GetAllPlayersTimers()
+		local playerTimers = allTimers[player.UserId] or {}
+
+		for timerName, timerData in pairs(playerTimers) do
+			-- Check if this timer is for a booster
+			if Boosters.Items[timerName] then
+				result[timerName] = timerData.timeRemaining
 			end
 		end
 
 		return result
 	end
 
-	-- Function to check if a specific booster is active
-	function Boosters.IsBoosterActive(player, boosterName)
-		if not player or not player.UserId then
+	-- Function to give booster items to a player
+	function Boosters.GiveBooster(player, boosterName, amount)
+		amount = amount or 1
+
+		if not Boosters.Items[boosterName] then
+			warn("Attempted to give unknown booster:", boosterName)
 			return false
 		end
 
-		-- First check via stats - this is more reliable than the in-memory tracking
-		-- which could get out of sync after server restarts or code updates
 		local Stat = require(game.ReplicatedStorage.Stat)
-		if Stat.WaitForLoad(player) then
-			local playerData = Stat.GetDataFolder(player)
-			if playerData then
-				local boostersFolder = playerData:FindFirstChild("Boosters")
-				if boostersFolder then
-					local activeState = boostersFolder:FindFirstChild(boosterName .. "Active")
-					if activeState and activeState:IsA("BoolValue") then
-						return activeState.Value
-					end
-				end
+		local boosterStat = Stat.Get(player, boosterName)
+
+		if not boosterStat then
+			-- Try to create the stat if it doesn't exist
+			Boosters.EnsureBoosterStats(player)
+			boosterStat = Stat.Get(player, boosterName)
+
+			if not boosterStat then
+				warn("Could not create or find booster stat:", boosterName)
+				return false
 			end
 		end
 
-		-- Fall back to the in-memory tracking if stat check didn't find anything
-		if not Boosters.ActiveBoosters[player.UserId] or
-			not Boosters.ActiveBoosters[player.UserId][boosterName] then
-			return false
-		end
-
-		-- Check if the booster has expired
-		local currentTime = os.time()
-		local boosterData = Boosters.ActiveBoosters[player.UserId][boosterName]
-		local timeLeft = boosterData.expirationTime - currentTime
-
-		-- If the booster has expired but wasn't properly cleaned up, clean it up now
-		if timeLeft <= 0 then
-			-- Clean up expired booster entry
-			if boosterData.cleanup and type(boosterData.cleanup) == "function" then
-				pcall(boosterData.cleanup)
-			end
-
-			-- Remove from active boosters
-			Boosters.ActiveBoosters[player.UserId][boosterName] = nil
-
-			-- Update the active status stat if it exists
-			if Stat.WaitForLoad(player) then
-				local playerData = Stat.GetDataFolder(player)
-				if playerData then
-					local boostersFolder = playerData:FindFirstChild("Boosters")
-					if boostersFolder then
-						local activeState = boostersFolder:FindFirstChild(boosterName .. "Active")
-						if activeState and activeState:IsA("BoolValue") then
-							activeState.Value = false
-						end
-					end
-				end
-			end
-
-			return false
-		end
-
+		boosterStat.Value = boosterStat.Value + amount
 		return true
+	end
+
+	-- Function to clean up a player's boosters when they leave
+	function Boosters.CleanupPlayerBoosters(player)
+		-- Load Timers module
+		local Timers = require(ReplicatedStorage.Modules.Core.Timers)
+
+		if not player or not player.UserId then return end
+
+		-- Clean up all active boosters for the player
+		if Boosters.ActiveBoosters[player.UserId] then
+			for boosterName, _ in pairs(Boosters.ActiveBoosters[player.UserId]) do
+				-- Cancel any active timers
+				if Timers.TimerExists(player, boosterName) then
+					Timers.CancelTimer(player, boosterName)
+				end
+			end
+
+			-- Clear the player's active boosters
+			Boosters.ActiveBoosters[player.UserId] = nil
+		end
 	end
 
 	-- Create necessary events when module is loaded
 	local function SetupEvents()
-		local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 		-- Create events folder if it doesn't exist
 		local BoosterEvents = ReplicatedStorage:FindFirstChild("BoosterEvents")
 		if not BoosterEvents then
@@ -446,33 +463,25 @@ if IsServer then
 		-- Ensure new players get booster stats created
 		Players.PlayerAdded:Connect(function(player)
 			Boosters.EnsureBoosterStats(player)
+
+			-- Check for active Crystals timer and sync slider visibility
+			task.delay(1, function() -- Small delay to ensure player is fully loaded
+				local Timers = require(ReplicatedStorage.Modules.Core.Timers)
+				local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+				local debugSystem = "Boosters"
+
+				if Timers.TimerExists(player, "Crystals") then
+					Utility.Log(debugSystem, "info", "Player " .. player.Name .. " joined with active Crystals timer - showing slider")
+					Boosters.SetSizeSliderVisibility(player, true)
+				else
+					Utility.Log(debugSystem, "info", "Player " .. player.Name .. " joined without active Crystals timer")
+				end
+			end)
 		end)
 	end
 
 	-- Initialize events when module is required on the server
 	SetupEvents()
-else
-	-- Client-side functionality
-
-	-- Define simple versions of functions for the client
-	function Boosters.GetActiveBoosters(player)
-		-- On the client, this just returns an empty table
-		-- The actual data comes from the leaderstats
-		return {}
-	end
-
-	function Boosters.IsBoosterActive(player, boosterName)
-		-- On the client, check leaderstats for active indicator
-		local leaderstats = player:FindFirstChild("leaderstats")
-		if leaderstats then
-			local boostersFolder = leaderstats:FindFirstChild("Boosters")
-			if boostersFolder then
-				local activeIndicator = boostersFolder:FindFirstChild(boosterName .. "_Active")
-				return activeIndicator ~= nil and activeIndicator.Value > 0
-			end
-		end
-		return false
-	end
 end
 
 return Boosters

@@ -290,14 +290,17 @@ function SizeSlider.Initialize(sliderFrame)
 			Utility.Log(debugSystem, "info", "Received visibility event with value: " .. tostring(visible))
 			-- Store current visibility (for debugging)
 			local previousVisibility = isSliderVisible
-			Utility.Log(debugSystem, "info", "Changing visibility from " .. tostring(previousVisibility) .. " to " .. tostring(visible))
+			Utility.Log(debugSystem, "info", "Current visibility is: " .. tostring(previousVisibility) .. ", requested visibility is: " .. tostring(visible))
 
 			if visible == false and isSliderVisible == true then
 				-- Only reset to default size when hiding
+				Utility.Log(debugSystem, "info", "Hiding slider - resetting to default size")
 				SizeSlider.Reset()
 			end
 
+			Utility.Log(debugSystem, "info", "About to set slider visibility to: " .. tostring(visible))
 			SizeSlider.SetVisible(visible)
+			Utility.Log(debugSystem, "info", "Slider visibility set complete. Current visibility state: " .. tostring(isSliderVisible))
 		end)
 	end
 
@@ -338,12 +341,14 @@ function SizeSlider.SetVisible(visible)
 	Utility.Log(debugSystem, "info", "SizeSlider.SetVisible called with value: " .. tostring(visible))
 
 	if sliderUI then
+		local wasVisible = sliderUI.Visible
 		sliderUI.Visible = visible
 		isSliderVisible = visible
-		Utility.Log(debugSystem, "info", "Slider visibility set to " .. tostring(visible))
+		Utility.Log(debugSystem, "info", "Slider visibility changed from " .. tostring(wasVisible) .. " to " .. tostring(visible))
 
 		if visible == true then
 			-- Apply current scale when showing
+			Utility.Log(debugSystem, "info", "Showing slider - applying current scale: " .. SizeSlider.DetentValues[currentSizeIndex])
 			applyCharacterScale()
 		end
 	else
@@ -353,6 +358,7 @@ end
 
 -- Get slider visibility state
 function SizeSlider.IsVisible()
+	Utility.Log(debugSystem, "info", "SizeSlider.IsVisible called, returning: " .. tostring(isSliderVisible))
 	return isSliderVisible
 end
 
