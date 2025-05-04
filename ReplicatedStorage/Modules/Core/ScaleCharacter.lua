@@ -37,6 +37,51 @@ ScaleCharacter.Presets = {
 -- Remote event for client-server communication
 local remoteEvent
 
+-- Function to ensure the scale-related stats exist for a player
+local function ensureScaleStatsExist(player)
+	if not IsServer then return end
+
+	-- Wait for player data to load
+	if not Stat.WaitForLoad(player) then
+		warn("ScaleCharacter: Failed to wait for player data to load")
+		return false
+	end
+
+	-- Get or create ScaleName stat (StringValue)
+	local scaleNameStat = Stat.Get(player, "ScaleName")
+	if not scaleNameStat then
+		-- Find player data folder
+		local playerData = Stat.GetDataFolder(player)
+		if not playerData then
+			warn("ScaleCharacter: Failed to get player data folder")
+			return false
+		end
+
+		-- Create ScaleName stat directly under player data folder
+		scaleNameStat = Instance.new("StringValue")
+		scaleNameStat.Name = "ScaleName"
+		scaleNameStat.Value = "normal" -- Default value
+		scaleNameStat.Parent = playerData
+		print("Created ScaleName stat for " .. player.Name .. " directly under player data folder")
+	end
+
+	-- Get or create ScaleValue stat (NumberValue)
+	local scaleValueStat = Stat.Get(player, "ScaleValue")
+	if not scaleValueStat then
+		-- Find player data folder
+		local playerData = Stat.GetDataFolder(player)
+
+		-- Create ScaleValue stat directly under player data folder
+		scaleValueStat = Instance.new("NumberValue")
+		scaleValueStat.Name = "ScaleValue"
+		scaleValueStat.Value = 1 -- Default value (normal scale)
+		scaleValueStat.Parent = playerData
+		print("Created ScaleValue stat for " .. player.Name .. " directly under player data folder")
+	end
+
+	return true
+end
+
 -- Initialize the module and set up the remote event
 function ScaleCharacter.Initialize()
 	-- Lazy load SizeSlider when needed
@@ -82,6 +127,29 @@ function ScaleCharacter.Initialize()
 
 			-- Scale the player who sent the request
 			ScaleCharacter.SetScale(player, scale)
+		end)
+
+		-- Set up player initialization to ensure data consistency
+		Players.PlayerAdded:Connect(function(player)
+			-- Wait for the player's character to spawn
+			local character = player.Character or player.CharacterAdded:Wait()
+
+			-- Wait for data to be fully loaded
+			if Stat.WaitForLoad(player) then
+				-- Ensure scale stats exist
+				ensureScaleStatsExist(player)
+
+				-- Characters always spawn at scale 1.0 - ensure data matches this
+				local scaleValueStat = Stat.Get(player, "ScaleValue")
+				local scaleNameStat = Stat.Get(player, "ScaleName")
+
+				if scaleValueStat and scaleNameStat then
+					-- Update data to match the actual character spawn scale
+					scaleValueStat.Value = 1.0
+					scaleNameStat.Value = "normal"
+					print("Initialized scale stats for " .. player.Name .. " to normal (1.0)")
+				end
+			end
 		end)
 
 		print("ScaleCharacter module initialized on server")
@@ -150,51 +218,6 @@ local function findClosestPresetName(scaleValue)
 	end
 
 	return closestName
-end
-
--- Function to ensure the scale-related stats exist for a player
-local function ensureScaleStatsExist(player)
-	if not IsServer then return end
-
-	-- Wait for player data to load
-	if not Stat.WaitForLoad(player) then
-		warn("ScaleCharacter: Failed to wait for player data to load")
-		return false
-	end
-
-	-- Get or create ScaleName stat (StringValue)
-	local scaleNameStat = Stat.Get(player, "ScaleName")
-	if not scaleNameStat then
-		-- Find player data folder
-		local playerData = Stat.GetDataFolder(player)
-		if not playerData then
-			warn("ScaleCharacter: Failed to get player data folder")
-			return false
-		end
-
-		-- Create ScaleName stat directly under player data folder
-		scaleNameStat = Instance.new("StringValue")
-		scaleNameStat.Name = "ScaleName"
-		scaleNameStat.Value = "normal" -- Default value
-		scaleNameStat.Parent = playerData
-		print("Created ScaleName stat for " .. player.Name .. " directly under player data folder")
-	end
-
-	-- Get or create ScaleValue stat (NumberValue)
-	local scaleValueStat = Stat.Get(player, "ScaleValue")
-	if not scaleValueStat then
-		-- Find player data folder
-		local playerData = Stat.GetDataFolder(player)
-
-		-- Create ScaleValue stat directly under player data folder
-		scaleValueStat = Instance.new("NumberValue")
-		scaleValueStat.Name = "ScaleValue"
-		scaleValueStat.Value = 1 -- Default value (normal scale)
-		scaleValueStat.Parent = playerData
-		print("Created ScaleValue stat for " .. player.Name .. " directly under player data folder")
-	end
-
-	return true
 end
 
 -- Scale a player's character to the specified scale

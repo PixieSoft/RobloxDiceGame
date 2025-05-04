@@ -147,6 +147,12 @@ function SliderManager.ResetSliderValue(sliderType, player)
 		if scaleChar and player then
 			scaleChar.SetScale(player, 1.0)
 		end
+
+		-- Also reset the slider UI position
+		local slider = getSliderModule(sliderType)
+		if slider and slider.Reset then
+			slider.Reset()
+		end
 	end
 end
 
