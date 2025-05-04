@@ -82,64 +82,6 @@ if IsServer then
 	-- Active boosters storage
 	Boosters.ActiveBoosters = {}
 
-	-- Centralized Slider Visibility Control Function
-	function Boosters.SetSizeSliderVisibility(player, visible)
-		-- Load Utility for debug logging
-		local Utility = require(ReplicatedStorage.Modules.Core.Utility)
-		local debugSystem = "Boosters"
-
-		-- Ensure remote event exists
-		local sizeSliderEvent = Boosters.GetSizeSliderEvent()
-
-		if not sizeSliderEvent then
-			Utility.Log(debugSystem, "warn", "Failed to get size slider event")
-			return false
-		end
-
-		-- Fire the visibility change event to the client
-		Utility.Log(debugSystem, "info", "Attempting to fire size slider visibility event to " .. player.Name .. " with value: " .. tostring(visible))
-
-		local success, err = pcall(function()
-			sizeSliderEvent:FireClient(player, visible)
-		end)
-
-		if success then
-			Utility.Log(debugSystem, "info", "Successfully fired size slider visibility event to " .. player.Name .. " with value: " .. tostring(visible))
-		else
-			Utility.Log(debugSystem, "warn", "Failed to fire size slider visibility event: " .. tostring(err))
-			return false
-		end
-
-		return true
-	end
-
-	-- Helper function to get or create the size slider event
-	function Boosters.GetSizeSliderEvent()
-		local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
-		if not eventsFolder then
-			eventsFolder = Instance.new("Folder")
-			eventsFolder.Name = "Events"
-			eventsFolder.Parent = ReplicatedStorage
-		end
-
-		local coreFolder = eventsFolder:FindFirstChild("Core")
-		if not coreFolder then
-			coreFolder = Instance.new("Folder")
-			coreFolder.Name = "Core"
-			coreFolder.Parent = eventsFolder
-		end
-
-		local sizeSliderEvent = coreFolder:FindFirstChild("SizeSliderVisibility")
-		if not sizeSliderEvent then
-			sizeSliderEvent = Instance.new("RemoteEvent")
-			sizeSliderEvent.Name = "SizeSliderVisibility"
-			sizeSliderEvent.Parent = coreFolder
-			print("[Boosters] Created SizeSliderVisibility RemoteEvent")
-		end
-
-		return sizeSliderEvent
-	end
-
 	-- Function to ensure all booster stats exist for a player
 	function Boosters.EnsureBoosterStats(player)
 		local Stat = require(game.ReplicatedStorage.Stat)
@@ -250,11 +192,6 @@ if IsServer then
 			end,
 
 			onCancel = function(timer)
-				-- Hide size slider before running cleanup
-				if boosterName == "Crystals" then
-					Boosters.SetSizeSliderVisibility(player, false)
-				end
-
 				-- Run cleanup when timer is canceled
 				Boosters.DeactivateBooster(player, boosterName)
 			end,
@@ -521,20 +458,6 @@ if IsServer then
 		-- Ensure new players get booster stats created
 		Players.PlayerAdded:Connect(function(player)
 			Boosters.EnsureBoosterStats(player)
-
-			-- Check for active Crystals timer and sync slider visibility
-			task.delay(1, function() -- Small delay to ensure player is fully loaded
-				local Timers = require(ReplicatedStorage.Modules.Core.Timers)
-				local Utility = require(ReplicatedStorage.Modules.Core.Utility)
-				local debugSystem = "Boosters"
-
-				if Timers.TimerExists(player, "Crystals") then
-					Utility.Log(debugSystem, "info", "Player " .. player.Name .. " joined with active Crystals timer - showing slider")
-					Boosters.SetSizeSliderVisibility(player, true)
-				else
-					Utility.Log(debugSystem, "info", "Player " .. player.Name .. " joined without active Crystals timer")
-				end
-			end)
 		end)
 	end
 

@@ -18,7 +18,7 @@ local IsClient = RunService:IsClient()
 
 -- Scaling constraints
 ScaleCharacter.MIN_SCALE = 0.25
-ScaleCharacter.MAX_SCALE = 10.0
+ScaleCharacter.MAX_SCALE = 4.0
 
 -- Values for testing
 ScaleCharacter.BASE_SPEED = 16
@@ -39,6 +39,11 @@ local remoteEvent
 
 -- Initialize the module and set up the remote event
 function ScaleCharacter.Initialize()
+	-- Lazy load SizeSlider when needed
+	if not SizeSlider then
+		SizeSlider = require(ReplicatedStorage.Modules.Core.SizeSlider)
+	end
+
 	-- Only create the RemoteEvent on the server
 	if IsServer then
 		-- Ensure the path exists
@@ -308,9 +313,6 @@ function ScaleCharacter.GetScale(player)
 
 	return scaleValue, scaleName
 end
-
--- Auto-initialize the module
-ScaleCharacter.Initialize()
 
 return ScaleCharacter
 -- /ReplicatedStorage/Modules/Core/ScaleCharacter.lua

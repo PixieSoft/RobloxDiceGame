@@ -7,7 +7,8 @@ local IsServer = RunService:IsServer()
 
 -- Import modules
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
-local ScaleCharacter = require(ReplicatedStorage.Modules.Core.ScaleCharacter)
+local SliderManager = require(ReplicatedStorage.Modules.Core.SliderManager)
+local sliderSize = SliderManager.SliderTypes.SIZE
 
 -- Create a table that we can reference from within its own methods
 local CrystalBooster = {}
@@ -43,23 +44,17 @@ CrystalBooster.onActivate = function(player, qty)
 		return function() end 
 	end
 
-	-- Add this line to access the Boosters module
-	local Boosters = require(ReplicatedStorage.Modules.Core.Boosters)
-
 	Utility.Log(debugSystem, "info", "Crystal booster onActivate called for " .. player.Name .. " with quantity " .. qty)
 
-	-- Now Boosters.SetSizeSliderVisibility will work
-	Boosters.SetSizeSliderVisibility(player, true)
+	-- Show size slider
+	SliderManager.ShowSlider(sliderSize)
 
 	-- Return cleanup function that handles BOTH slider and scaling
 	return function()
 		Utility.Log(debugSystem, "info", "Crystal booster cleanup function called for " .. player.Name)
 
-		-- Hide the slider first
-		Boosters.SetSizeSliderVisibility(player, false)
-
-		-- Then handle our own scaling cleanup
-		ScaleCharacter.SetScale(player, 1.0)
+		-- Hide slider and reset scale to 1.0
+		SliderManager.HideAndResetSlider(sliderSize, player)
 
 		Utility.Log(debugSystem, "info", "Crystal effect cleanup completed for " .. player.Name)
 	end

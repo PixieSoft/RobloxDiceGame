@@ -6,4 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Simply requiring the module will trigger its auto-initialization
 local SizeSlider = require(ReplicatedStorage.Modules.Core.SizeSlider)
 
--- /StarterPlayer/StarterPlayerScripts/SizeSliderLoader.lua
+-- In SizeSliderLoader.lua
+local ScaleCharacter = require(ReplicatedStorage.Modules.Core.ScaleCharacter)
+
+-- Make sure ScaleCharacter is initialized on client
+ScaleCharacter.Initialize()
