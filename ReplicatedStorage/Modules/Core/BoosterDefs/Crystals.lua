@@ -13,7 +13,7 @@ local ScaleCharacter = require(ReplicatedStorage.Modules.Core.ScaleCharacter)
 local CrystalBooster = {}
 
 -- Debug settings
-local debugSystem = "Boosters" -- System name for debug logs
+local debugSystem = "Crystals" -- System name for debug logs
 
 -- Define properties
 CrystalBooster.name = "Crystals"
@@ -37,25 +37,28 @@ CrystalBooster.calculateEffect = function(spendingAmount)
 	return "Crystal power for " .. timeText .. " using " .. spendingAmount .. " " .. pluralText .. ". Allows size changing."
 end
 
--- Function that runs when booster is activated
 CrystalBooster.onActivate = function(player, qty)
-	-- This function only runs on the server
 	if not IsServer then 
 		Utility.Log(debugSystem, "warn", "onActivate called on client - this should only run on server")
 		return function() end 
 	end
 
+	-- Add this line to access the Boosters module
+	local Boosters = require(ReplicatedStorage.Modules.Core.Boosters)
+
 	Utility.Log(debugSystem, "info", "Crystal booster onActivate called for " .. player.Name .. " with quantity " .. qty)
 
-	-- NOTE: The size slider visibility is now handled centrally by Boosters.lua
-	-- We no longer need to manage slider visibility here
+	-- Now Boosters.SetSizeSliderVisibility will work
+	Boosters.SetSizeSliderVisibility(player, true)
 
-	-- Return cleanup function that will run when the booster expires or is canceled
-	-- This function is called by Boosters.lua when the timer completes or is canceled
+	-- Return cleanup function that handles BOTH slider and scaling
 	return function()
 		Utility.Log(debugSystem, "info", "Crystal booster cleanup function called for " .. player.Name)
 
-		-- Reset character to default size (1.0)
+		-- Hide the slider first
+		Boosters.SetSizeSliderVisibility(player, false)
+
+		-- Then handle our own scaling cleanup
 		ScaleCharacter.SetScale(player, 1.0)
 
 		Utility.Log(debugSystem, "info", "Crystal effect cleanup completed for " .. player.Name)

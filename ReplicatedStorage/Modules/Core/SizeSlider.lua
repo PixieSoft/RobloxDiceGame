@@ -292,12 +292,6 @@ function SizeSlider.Initialize(sliderFrame)
 			local previousVisibility = isSliderVisible
 			Utility.Log(debugSystem, "info", "Current visibility is: " .. tostring(previousVisibility) .. ", requested visibility is: " .. tostring(visible))
 
-			if visible == false and isSliderVisible == true then
-				-- Only reset to default size when hiding
-				Utility.Log(debugSystem, "info", "Hiding slider - resetting to default size")
-				SizeSlider.Reset()
-			end
-
 			Utility.Log(debugSystem, "info", "About to set slider visibility to: " .. tostring(visible))
 			SizeSlider.SetVisible(visible)
 			Utility.Log(debugSystem, "info", "Slider visibility set complete. Current visibility state: " .. tostring(isSliderVisible))
@@ -425,6 +419,65 @@ if RunService:IsClient() then
 	end
 
 	task.spawn(findAndInitializeSlider)
+end
+
+-- Client-side event listeners for showing/hiding the slider
+if RunService:IsClient() then
+	local function setupRemoteEventListeners()
+		-- Import Utility module for logging
+		local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+
+		-- Wait for the BoosterEvents folder to be available
+		local BoosterEvents = ReplicatedStorage:WaitForChild("BoosterEvents", 10)
+		if not BoosterEvents then
+			Utility.Log(debugSystem, "warn", "BoosterEvents folder not found after waiting")
+			return
+		end
+
+		-- Wait for the specific events
+		local showEvent = BoosterEvents:WaitForChild("ShowSizeSlider", 10)
+		local hideEvent = BoosterEvents:WaitForChild("HideSizeSlider", 10)
+
+		if not showEvent or not hideEvent then
+			Utility.Log(debugSystem, "warn", "Size slider remote events not found after waiting")
+			return
+		end
+
+		-- Connect to show event
+		showEvent.OnClientEvent:Connect(function()
+			Utility.Log(debugSystem, "info", "Received ShowSizeSlider event - showing slider")
+			if not isInitialized then
+				Utility.Log(debugSystem, "warn", "SizeSlider not initialized when show event received")
+				return
+			end
+			SizeSlider.SetVisible(true)
+		end)
+
+		-- Connect to hide event  
+		hideEvent.OnClientEvent:Connect(function()
+			Utility.Log(debugSystem, "info", "Received HideSizeSlider event - hiding slider")
+			if not isInitialized then
+				Utility.Log(debugSystem, "warn", "SizeSlider not initialized when hide event received")
+				return
+			end
+			SizeSlider.SetVisible(false)
+		end)
+
+		Utility.Log(debugSystem, "info", "Size slider remote event listeners set up successfully")
+	end
+
+	-- Run setup after the slider is initialized
+	if isInitialized then
+		setupRemoteEventListeners()
+	else
+		-- Wait for initialization to complete
+		task.defer(function()
+			while not isInitialized do
+				task.wait(0.1)
+			end
+			setupRemoteEventListeners()
+		end)
+	end
 end
 
 return SizeSlider

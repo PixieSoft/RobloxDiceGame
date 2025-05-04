@@ -378,9 +378,30 @@ end
 local function updateTimer(timer, deltaTime)
 	if timer.isComplete then return false end
 
-	-- Update the timer
-	local previousTimeRemaining = timer.timeRemaining
-	timer.timeRemaining = math.max(0, timer.timeRemaining - deltaTime)
+	-- Check if this timer has been adjusted (for booster recovery)
+	local isAdjusted = Timers.GetCustomValue(Players:GetPlayerByUserId(timer.playerId), 
+		timer.simpleName, "IsAdjusted", false)
+
+	local actualTimeRemaining
+
+	if isAdjusted then
+		-- Calculate actual time remaining based on adjusted start time
+		local adjustedStartTime = Timers.GetCustomValue(Players:GetPlayerByUserId(timer.playerId), 
+			timer.simpleName, "AdjustedStartTime", os.time())
+
+		local timeElapsed = os.time() - adjustedStartTime
+		actualTimeRemaining = timer.duration - timeElapsed
+
+		-- Ensure time doesn't go negative
+		actualTimeRemaining = math.max(0, actualTimeRemaining)
+
+		-- Update the timer's timeRemaining
+		timer.timeRemaining = actualTimeRemaining
+	else
+		-- Regular timer update
+		actualTimeRemaining = timer.timeRemaining
+		timer.timeRemaining = math.max(0, timer.timeRemaining - deltaTime)
+	end
 
 	-- Check for halfway point
 	if not timer.isHalfwayReached and timer.timeRemaining <= timer.duration / 2 then
@@ -401,7 +422,7 @@ local function updateTimer(timer, deltaTime)
 	end
 
 	-- Only call tick if time actually changed (by at least 0.1 second to avoid excessive callbacks)
-	if math.abs(previousTimeRemaining - timer.timeRemaining) >= 0.1 and timer.callbacks.onTick then
+	if math.abs(actualTimeRemaining - timer.timeRemaining) >= 0.1 and timer.callbacks.onTick then
 		task.spawn(timer.callbacks.onTick, timer)
 	end
 
@@ -842,8 +863,21 @@ function Timers.LoadPlayerTimers(player)
 			activeTimersCount = activeTimersCount + 1
 			loadedCount = loadedCount + 1
 
-			-- Update the timer data
-			Timers.SaveTimer(player, timerName, timer)
+			-- Check if this timer belongs to a booster that needs special recovery
+			local Boosters = require(ReplicatedStorage.Modules.Core.Boosters)
+			if Boosters and Boosters.Items[timerName] then
+				-- This is a booster timer - handle recovery
+				Utility.Log(debugSystem, "info", "Found booster timer " .. timerName .. 
+					" - starting recovery process")
+
+				-- Run recovery in a task to ensure it happens after timer loading
+				task.defer(function()
+					Boosters.RecoverBoosterFromTimer(player, timerName, timer)
+				end)
+			else
+				-- Regular timer - just save its state
+				Timers.SaveTimer(player, timerName, timer)
+			end
 		end
 	end
 
