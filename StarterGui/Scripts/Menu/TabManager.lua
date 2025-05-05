@@ -16,6 +16,12 @@ local TopTabs = Main:WaitForChild("TopTabs")
 local SideTabs = Main:WaitForChild("SideTabs")
 local Content = Main:WaitForChild("Content")
 
+-- Import Utility for debug logging
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+
+-- Debug settings
+local debugSystem = "Menu"
+
 -- Track the currently active tabs
 local activeTopTab = nil
 local activeSideTabs = {}
@@ -92,7 +98,7 @@ selectSideTab = function(topTabName, sideTabName)
 
 			-- NEW CODE: Initialize BoosterInventory when the Boosters tab is selected
 			if topTabName == "Items" and sideTabName == "Boosters" then
-				print("Boosters tab selected - ensuring BoosterInventory is initialized")
+				Utility.Log(debugSystem, "info", "Boosters tab selected - ensuring BoosterInventory is initialized")
 
 				-- Wait a tiny bit to make sure UI is fully loaded
 				task.spawn(function()
@@ -103,20 +109,20 @@ selectSideTab = function(topTabName, sideTabName)
 
 					if success and BoosterInventory then
 						-- Initialize the module with the main UI reference
-						print("Calling BoosterInventory.Initialize with MainUI reference")
+						Utility.Log(debugSystem, "info", "Calling BoosterInventory.Initialize with MainUI reference")
 						BoosterInventory.Initialize(Menu)
 
 						-- Refresh the inventory after initialization
-						print("Refreshing inventory after initialization")
+						Utility.Log(debugSystem, "info", "Refreshing inventory after initialization")
 						BoosterInventory.Refresh()
 					else
-						warn("Failed to load BoosterInventory module: " .. tostring(BoosterInventory))
+						Utility.Log(debugSystem, "warn", "Failed to load BoosterInventory module: " .. tostring(BoosterInventory))
 					end
 				end)
 			end
 		end
 	else
-		print("Warning: No Content reference found for side tab:", sideTabName)
+		Utility.Log(debugSystem, "warn", "No Content reference found for side tab: " .. sideTabName)
 	end
 
 	-- Track the active side tab for this top tab
@@ -141,7 +147,7 @@ selectTopTab = function(tabName)
 	-- Find the top tab button
 	local topTabButton = TopTabs:FindFirstChild(tabName)
 	if not topTabButton then
-		warn("Top tab button not found:", tabName)
+		Utility.Log(debugSystem, "warn", "Top tab button not found: " .. tabName)
 		return
 	end
 
@@ -175,7 +181,7 @@ selectTopTab = function(tabName)
 			end
 		end
 	else
-		warn("No SideTabs reference found for top tab:", tabName)
+		Utility.Log(debugSystem, "warn", "No SideTabs reference found for top tab: " .. tabName)
 	end
 
 	-- Update visual state of top tabs
@@ -264,4 +270,4 @@ Menu:GetPropertyChangedSignal("Enabled"):Connect(function()
 	end
 end)
 
-print("Tab Manager initialized successfully")
+Utility.Log(debugSystem, "info", "Tab Manager initialized successfully")

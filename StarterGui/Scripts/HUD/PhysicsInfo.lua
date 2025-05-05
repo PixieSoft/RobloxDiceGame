@@ -1,9 +1,16 @@
--- /StarterGui/Scripts/DevTools/PhysicsInfo.lua
+-- /StarterGui/Scripts/HUD/PhysicsInfo.lua
 -- LocalScript that creates a dynamic GUI for viewing and modifying character physics properties
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Debug settings
+local debugSystem = "Physics" -- System name for debug logs
+
+-- Import modules
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -226,6 +233,7 @@ for i, config in ipairs(statConfigs) do
 						local humanoid = character:FindFirstChildOfClass("Humanoid")
 						if humanoid then
 							humanoid[config.name] = value
+							Utility.Log(debugSystem, "info", "Updated " .. config.name .. " to " .. value)
 						end
 					end
 
@@ -256,6 +264,7 @@ for i, config in ipairs(statConfigs) do
 
 					-- Clear input box
 					inputBox.Text = ""
+					Utility.Log(debugSystem, "warn", "Invalid input for " .. config.name .. ": " .. tostring(inputBox.Text))
 				end
 			end
 		end)
@@ -328,6 +337,8 @@ end
 
 -- Set up event connections for player
 player.CharacterAdded:Connect(function(character)
+	Utility.Log(debugSystem, "info", "Character spawned, setting up property tracking")
+	
 	-- Wait for the humanoid to be added
 	local humanoid = character:WaitForChild("Humanoid")
 
@@ -339,6 +350,7 @@ player.CharacterAdded:Connect(function(character)
 				local success, value = pcall(function() return humanoid[statName] end)
 				if success and value ~= nil then
 					row.valueLabel.Text = string.format("%.1f", value)
+					Utility.Log(debugSystem, "info", "Property changed: " .. statName .. " = " .. value)
 				end
 			end)
 		end
@@ -351,6 +363,8 @@ end)
 
 -- Initial update if character already exists
 if player.Character then
+	Utility.Log(debugSystem, "info", "Setting up property tracking for existing character")
+	
 	local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		-- Set up property change detection for humanoid stats
@@ -361,6 +375,7 @@ if player.Character then
 					local success, value = pcall(function() return humanoid[statName] end)
 					if success and value ~= nil then
 						row.valueLabel.Text = string.format("%.1f", value)
+						Utility.Log(debugSystem, "info", "Property changed: " .. statName .. " = " .. value)
 					end
 				end)
 			end
@@ -389,6 +404,7 @@ end)
 -- Toggle visibility function
 local function toggleVisibility()
 	statsFrame.Visible = not statsFrame.Visible
+	Utility.Log(debugSystem, "info", "Toggled physics GUI visibility to " .. tostring(statsFrame.Visible))
 end
 
 -- Expose toggle function via _G for other scripts
@@ -400,10 +416,11 @@ statsFrame.Visible = true
 -- Clean up connections when script is destroyed
 script.AncestryChanged:Connect(function(_, newParent)
 	if newParent == nil then
+		Utility.Log(debugSystem, "info", "Cleaning up physics GUI connections")
 		if massUpdateConnection then
 			massUpdateConnection:Disconnect()
 		end
 	end
 end)
 
-print("Physics Info GUI initialized with mass and density display")
+Utility.Log(debugSystem, "info", "Physics Info GUI initialized with mass and density display")

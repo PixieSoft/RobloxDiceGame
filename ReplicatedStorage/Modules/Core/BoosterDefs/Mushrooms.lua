@@ -12,6 +12,9 @@ local Timers = require(ReplicatedStorage.Modules.Core.Timers)
 -- Create a table that we can reference from within its own methods
 local MushroomBooster = {}
 
+-- Debug settings
+local debugSystem = "Mushrooms" -- System name for debug logs
+
 -- Define properties
 MushroomBooster.name = "Shrooms"
 MushroomBooster.description = "+1.0 jump height for 1 minute per mushroom."
@@ -70,7 +73,7 @@ MushroomBooster.onActivate = function(player, qty)
 	end
 
 	-- Print feedback
-	print("Activated Mushroom booster for " .. player.Name .. ": +" .. 
+	Utility.Log(debugSystem, "info", "Activated Mushroom booster for " .. player.Name .. ": +" .. 
 		heightBoost .. " jump height boost (to " .. newJumpHeight .. 
 		" studs) for " .. (qty * MushroomBooster.duration) .. " seconds")
 
@@ -81,7 +84,7 @@ MushroomBooster.onActivate = function(player, qty)
 	-- Define timer callbacks
 	local callbacks = {
 		onStart = function(timer)
-			print("Started Mushroom jump boost timer for " .. player.Name)
+			Utility.Log(debugSystem, "info", "Started Mushroom jump boost timer for " .. player.Name)
 		end,
 
 		onTick = function(timer)
@@ -96,7 +99,7 @@ MushroomBooster.onActivate = function(player, qty)
 				if currentHumanoid then
 					currentHumanoid.JumpHeight = originalJumpHeight
 					currentHumanoid.JumpPower = originalJumpPower
-					print("Mushroom booster expired for " .. player.Name .. ": jump ability restored")
+					Utility.Log(debugSystem, "info", "Mushroom booster expired for " .. player.Name .. ": jump ability restored")
 				end
 			end
 		end,
@@ -109,7 +112,7 @@ MushroomBooster.onActivate = function(player, qty)
 				if currentHumanoid then
 					currentHumanoid.JumpHeight = originalJumpHeight
 					currentHumanoid.JumpPower = originalJumpPower
-					print("Mushroom booster canceled for " .. player.Name .. ": jump ability restored")
+					Utility.Log(debugSystem, "info", "Mushroom booster canceled for " .. player.Name .. ": jump ability restored")
 				end
 			end
 		end
@@ -157,7 +160,7 @@ MushroomBooster.onActivate = function(player, qty)
 				if currentHumanoid then
 					currentHumanoid.JumpHeight = originalJumpHeight
 					currentHumanoid.JumpPower = originalJumpPower
-					print("Mushroom booster cleanup: jump ability restored for " .. player.Name)
+					Utility.Log(debugSystem, "info", "Mushroom booster cleanup: jump ability restored for " .. player.Name)
 				end
 			end
 		end

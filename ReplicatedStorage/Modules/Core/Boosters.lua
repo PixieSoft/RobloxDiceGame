@@ -12,6 +12,12 @@ local RunService = game:GetService("RunService")
 -- Check if this is running on the server or client  
 local IsServer = RunService:IsServer()
 
+-- Import Utility for logging
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+
+-- Debug system name for logging
+local debugSystem = "Boosters"
+
 -- Booster Types for categorization
 Boosters.BoosterTypes = {
 	PLAYER = "PlayerBoost", -- Affects player character
@@ -42,10 +48,10 @@ local function loadBooster(name, module)
 
 		-- Add to the Items dictionary
 		Boosters.Items[name] = boosterData
-		print("Successfully loaded booster module: " .. name)
+		Utility.Log(debugSystem, "info", "Successfully loaded booster module: " .. name)
 		return true
 	else
-		warn("Failed to load booster module " .. name .. ": " .. tostring(boosterData))
+		Utility.Log(debugSystem, "warn", "Failed to load booster module " .. name .. ": " .. tostring(boosterData))
 		return false
 	end
 end
@@ -54,7 +60,7 @@ end
 local function loadBoosterModules()
 	-- Check if the Boosters folder exists
 	if not BOOSTERS_PATH then
-		error("Boosters folder not found at path: ReplicatedStorage.Modules.Core.Boosters")
+		Utility.Log(debugSystem, "err", "Boosters folder not found at path: ReplicatedStorage.Modules.Core.Boosters")
 		return
 	end
 
@@ -71,7 +77,7 @@ local function loadBoosterModules()
 	for name, _ in pairs(Boosters.Items) do
 		boosterCount = boosterCount + 1
 	end
-	print("Total boosters loaded:", boosterCount)
+	Utility.Log(debugSystem, "info", "Total boosters loaded: " .. boosterCount)
 end
 
 -- Initialize the boosters
@@ -88,14 +94,14 @@ if IsServer then
 
 		-- Make sure player data is loaded
 		if not Stat.WaitForLoad(player) then
-			warn("Player data failed to load for", player.Name)
+			Utility.Log(debugSystem, "warn", "Player data failed to load for " .. player.Name)
 			return false
 		end
 
 		-- Try to get data folder
 		local dataFolder = Stat.GetDataFolder(player)
 		if not dataFolder then
-			warn("Could not get data folder for player", player.Name)
+			Utility.Log(debugSystem, "warn", "Could not get data folder for player " .. player.Name)
 			return false
 		end
 
@@ -131,13 +137,13 @@ if IsServer then
 		-- Get booster configuration
 		local booster = Boosters.Items[boosterName]
 		if not booster then
-			warn("Attempted to use unknown booster:", boosterName)
+			Utility.Log(debugSystem, "warn", "Attempted to use unknown booster: " .. boosterName)
 			return false
 		end
 
 		-- Check if this booster is already active using the Timers system
 		if Timers.TimerExists(player, boosterName) then
-			warn("Cannot activate booster while already active:", boosterName)
+			Utility.Log(debugSystem, "warn", "Cannot activate booster while already active: " .. boosterName)
 			return false
 		end
 
@@ -151,11 +157,11 @@ if IsServer then
 			if success then
 				cleanupFunction = result
 			else
-				warn("Failed to activate booster " .. boosterName .. ": " .. tostring(result))
+				Utility.Log(debugSystem, "warn", "Failed to activate booster " .. boosterName .. ": " .. tostring(result))
 				return false
 			end
 		else
-			warn("Booster " .. boosterName .. " doesn't have an onActivate function")
+			Utility.Log(debugSystem, "warn", "Booster " .. boosterName .. " doesn't have an onActivate function")
 			return false
 		end
 
@@ -205,7 +211,7 @@ if IsServer then
 		local timer = Timers.CreateTimer(player, boosterName, totalDuration, callbacks)
 
 		if not timer then
-			warn("Failed to create timer for " .. boosterName)
+			Utility.Log(debugSystem, "warn", "Failed to create timer for " .. boosterName)
 			return false
 		end
 
@@ -238,7 +244,7 @@ if IsServer then
 			end)
 
 			if not success then
-				warn("Error in cleanup function for booster", boosterName, ":", errorMsg)
+				Utility.Log(debugSystem, "warn", "Error in cleanup function for booster " .. boosterName .. ": " .. errorMsg)
 			end
 		end
 
@@ -309,7 +315,7 @@ if IsServer then
 		amount = amount or 1
 
 		if not Boosters.Items[boosterName] then
-			warn("Attempted to give unknown booster:", boosterName)
+			Utility.Log(debugSystem, "warn", "Attempted to give unknown booster: " .. boosterName)
 			return false
 		end
 
@@ -322,7 +328,7 @@ if IsServer then
 			boosterStat = Stat.Get(player, boosterName)
 
 			if not boosterStat then
-				warn("Could not create or find booster stat:", boosterName)
+				Utility.Log(debugSystem, "warn", "Could not create or find booster stat: " .. boosterName)
 				return false
 			end
 		end
@@ -354,8 +360,6 @@ if IsServer then
 
 	-- Function to recover booster state from a loaded timer
 	function Boosters.RecoverBoosterFromTimer(player, timerName, timer)
-		local debugSystem = "Boosters"
-		local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 		local Timers = require(ReplicatedStorage.Modules.Core.Timers)
 
 		-- Check if this timer belongs to a booster

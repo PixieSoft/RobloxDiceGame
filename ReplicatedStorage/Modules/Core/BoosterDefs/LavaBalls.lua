@@ -8,6 +8,9 @@ local IsServer = RunService:IsServer()
 -- Import utility module
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
+-- Debug system name for logging
+local debugSystem = "LavaBalls"
+
 -- Create a table that we can reference from within its own methods
 local LavaBallsBooster = {}
 
@@ -50,11 +53,11 @@ LavaBallsBooster.onActivate = function(player, qty)
 	-- Implementation of creating platforms would go here
 	-- This is a placeholder that would be filled with actual platform creation code
 
-	print("Activated Lava Ball booster for " .. player.Name .. " with " .. qty .. " balls")
+	Utility.Log(debugSystem, "info", "Activated Lava Ball booster for " .. player.Name .. " with " .. qty .. " balls")
 
 	-- Return a proper cleanup function
 	return function()
-		print("Lava Ball platforms cleaned up for " .. player.Name)
+		Utility.Log(debugSystem, "info", "Lava Ball platforms cleaned up for " .. player.Name)
 	end
 end
 

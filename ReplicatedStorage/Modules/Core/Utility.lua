@@ -1,6 +1,8 @@
 -- /ReplicatedStorage/Modules/Core/Utility.lua
 -- ModuleScript that provides utility functions for various systems
 
+local debugSystem = "Utility" -- System name for debug logs
+
 local Utility = {}
 
 -- Format a time duration in seconds into a human-readable string
@@ -57,6 +59,8 @@ function Utility.Log(System, Severity, Text)
 
 	-- If the Debug folder doesn't exist, do nothing
 	if not DebugFolder then
+		-- Note: We can't use Log here since we're inside it - would create recursion
+		-- But that's okay, this is expected behavior when Debug folder doesn't exist
 		return
 	end
 
@@ -71,6 +75,10 @@ function Utility.Log(System, Severity, Text)
 
 	-- If flag doesn't exist or is disabled, don't log
 	if not SystemFlag or not SystemFlag.Value then
+		-- If this is our own log request, do a basic print without recursion
+		if System == debugSystem then
+			print("[" .. System .. "] " .. Text .. " (internal)")
+		end
 		return
 	end
 

@@ -13,6 +13,9 @@ local Timers = nil
 -- Create a table that we can reference from within its own methods
 local BugsBooster = {}
 
+-- Debug settings
+local debugSystem = "Bugs" -- System name for debug logs
+
 -- Define properties
 BugsBooster.name = "Bugs"
 BugsBooster.description = "+1% speed for 1 minute per bug."
@@ -38,7 +41,10 @@ end
 -- Function that runs when booster is activated
 BugsBooster.onActivate = function(player, qty)
 	-- This function only runs on the server
-	if not IsServer then return function() end end
+	if not IsServer then 
+		Utility.Log(debugSystem, "warn", "onActivate called on client - should only run on server")
+		return function() end 
+	end
 
 	-- Lazy load Timers module
 	if not Timers then
@@ -47,10 +53,16 @@ BugsBooster.onActivate = function(player, qty)
 
 	-- Get the player's character and humanoid
 	local character = player.Character
-	if not character then return function() end end
+	if not character then 
+		Utility.Log(debugSystem, "warn", "Character not found for player: " .. player.Name)
+		return function() end 
+	end
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return function() end end
+	if not humanoid then 
+		Utility.Log(debugSystem, "warn", "Humanoid not found for player: " .. player.Name)
+		return function() end 
+	end
 
 	-- Store original walk speed
 	local originalWalkSpeed = humanoid.WalkSpeed
@@ -61,8 +73,8 @@ BugsBooster.onActivate = function(player, qty)
 	local speedBoost = math.max(percentBoost, 1)
 	humanoid.WalkSpeed = originalWalkSpeed + speedBoost
 
-	-- Print feedback
-	print("Activated Bug booster for " .. player.Name .. ": +" .. qty .. "% walkspeed (" .. 
+	-- Log feedback
+	Utility.Log(debugSystem, "info", "Activated Bug booster for " .. player.Name .. ": +" .. qty .. "% walkspeed (" .. 
 		humanoid.WalkSpeed .. ") for " .. (qty * BugsBooster.duration) .. " seconds")
 
 	-- Create a character added connection to handle respawns during the effect
@@ -74,6 +86,7 @@ BugsBooster.onActivate = function(player, qty)
 		-- Apply the speed boost to the new character
 		if newHumanoid then
 			newHumanoid.WalkSpeed = originalWalkSpeed + speedBoost
+			Utility.Log(debugSystem, "info", "Applied speed boost to respawned character for: " .. player.Name)
 		end
 	end)
 
@@ -83,7 +96,7 @@ BugsBooster.onActivate = function(player, qty)
 
 	local callbacks = {
 		onStart = function(timer)
-			print("Bugs speed boost started for " .. player.Name .. " - Duration: " .. totalDuration .. "s")
+			Utility.Log(debugSystem, "info", "Bug booster timer started for " .. player.Name .. " - Duration: " .. totalDuration .. "s")
 		end,
 
 		onComplete = function(timer)
@@ -93,7 +106,7 @@ BugsBooster.onActivate = function(player, qty)
 				local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
 				if currentHumanoid then
 					currentHumanoid.WalkSpeed = originalWalkSpeed
-					print("Bug booster expired for " .. player.Name .. ": walkspeed restored to " .. originalWalkSpeed)
+					Utility.Log(debugSystem, "info", "Bug booster expired for " .. player.Name .. ": walkspeed restored to " .. originalWalkSpeed)
 				end
 			end
 
@@ -110,7 +123,7 @@ BugsBooster.onActivate = function(player, qty)
 				local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
 				if currentHumanoid then
 					currentHumanoid.WalkSpeed = originalWalkSpeed
-					print("Bug booster canceled for " .. player.Name .. ": walkspeed restored to " .. originalWalkSpeed)
+					Utility.Log(debugSystem, "info", "Bug booster canceled for " .. player.Name .. ": walkspeed restored to " .. originalWalkSpeed)
 				end
 			end
 
@@ -142,7 +155,7 @@ BugsBooster.onActivate = function(player, qty)
 			local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
 			if currentHumanoid then
 				currentHumanoid.WalkSpeed = originalWalkSpeed
-				print("Bug booster cleanup for " .. player.Name .. ": walkspeed restored to " .. originalWalkSpeed)
+				Utility.Log(debugSystem, "info", "Bug booster cleanup for " .. player.Name .. ": walkspeed restored to " .. originalWalkSpeed)
 			end
 		end
 

@@ -11,6 +11,10 @@ local Players = game:GetService("Players")
 
 -- Import the Stat module for persistent storage
 local Stat = require(ReplicatedStorage.Stat)
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+
+-- Debug settings
+local debugSystem = "Scaling" -- System name for debug logs
 
 -- Determine if we're on the client or server
 local IsServer = RunService:IsServer()
@@ -43,7 +47,7 @@ local function ensureScaleStatsExist(player)
 
 	-- Wait for player data to load
 	if not Stat.WaitForLoad(player) then
-		warn("ScaleCharacter: Failed to wait for player data to load")
+		Utility.Log(debugSystem, "warn", "Failed to wait for player data to load")
 		return false
 	end
 
@@ -53,7 +57,7 @@ local function ensureScaleStatsExist(player)
 		-- Find player data folder
 		local playerData = Stat.GetDataFolder(player)
 		if not playerData then
-			warn("ScaleCharacter: Failed to get player data folder")
+			Utility.Log(debugSystem, "warn", "Failed to get player data folder")
 			return false
 		end
 
@@ -62,7 +66,7 @@ local function ensureScaleStatsExist(player)
 		scaleNameStat.Name = "ScaleName"
 		scaleNameStat.Value = "normal" -- Default value
 		scaleNameStat.Parent = playerData
-		print("Created ScaleName stat for " .. player.Name .. " directly under player data folder")
+		Utility.Log(debugSystem, "info", "Created ScaleName stat for " .. player.Name .. " directly under player data folder")
 	end
 
 	-- Get or create ScaleValue stat (NumberValue)
@@ -76,7 +80,7 @@ local function ensureScaleStatsExist(player)
 		scaleValueStat.Name = "ScaleValue"
 		scaleValueStat.Value = 1 -- Default value (normal scale)
 		scaleValueStat.Parent = playerData
-		print("Created ScaleValue stat for " .. player.Name .. " directly under player data folder")
+		Utility.Log(debugSystem, "info", "Created ScaleValue stat for " .. player.Name .. " directly under player data folder")
 	end
 
 	return true
@@ -121,7 +125,7 @@ function ScaleCharacter.Initialize()
 			if targetPlayer and targetPlayer ~= player then
 				-- Here you could add admin permission check
 				-- For now, just prevent scaling other players from client
-				warn("Player " .. player.Name .. " attempted to scale " .. targetPlayer.Name .. " but lacks permission")
+				Utility.Log(debugSystem, "warn", "Player " .. player.Name .. " attempted to scale " .. targetPlayer.Name .. " but lacks permission")
 				return
 			end
 
@@ -147,32 +151,32 @@ function ScaleCharacter.Initialize()
 					-- Update data to match the actual character spawn scale
 					scaleValueStat.Value = 1.0
 					scaleNameStat.Value = "normal"
-					print("Initialized scale stats for " .. player.Name .. " to normal (1.0)")
+					Utility.Log(debugSystem, "info", "Initialized scale stats for " .. player.Name .. " to normal (1.0)")
 				end
 			end
 		end)
 
-		print("ScaleCharacter module initialized on server")
+		Utility.Log(debugSystem, "info", "ScaleCharacter module initialized on server")
 	else
 		-- On client, wait for the RemoteEvent to exist at the correct path
 		local eventsFolder = ReplicatedStorage:WaitForChild("Events", 5)
 		if not eventsFolder then
-			warn("ScaleCharacter: Events folder not found in ReplicatedStorage")
+			Utility.Log(debugSystem, "warn", "Events folder not found in ReplicatedStorage")
 			return false
 		end
 
 		local coreFolder = eventsFolder:WaitForChild("Core", 5)
 		if not coreFolder then
-			warn("ScaleCharacter: Core folder not found in Events")
+			Utility.Log(debugSystem, "warn", "Core folder not found in Events")
 			return false
 		end
 
 		remoteEvent = coreFolder:WaitForChild("ScaleCharacter", 5)
 		if not remoteEvent then
-			warn("ScaleCharacter RemoteEvent not found after waiting")
+			Utility.Log(debugSystem, "warn", "ScaleCharacter RemoteEvent not found after waiting")
 			return false
 		else
-			print("ScaleCharacter module initialized on client")
+			Utility.Log(debugSystem, "info", "ScaleCharacter module initialized on client")
 		end
 	end
 
@@ -188,11 +192,11 @@ local function resolveScaleValue(scale)
 		if presetValue then
 			return presetValue
 		else
-			warn("ScaleCharacter: Unknown preset '" .. scale .. "', using 'normal' instead")
+			Utility.Log(debugSystem, "warn", "Unknown preset '" .. scale .. "', using 'normal' instead")
 			return ScaleCharacter.Presets.normal
 		end
 	else
-		warn("ScaleCharacter: Invalid scale type, using 'normal' instead")
+		Utility.Log(debugSystem, "warn", "Invalid scale type, using 'normal' instead")
 		return ScaleCharacter.Presets.normal
 	end
 end
@@ -229,7 +233,7 @@ function ScaleCharacter.SetScale(player, scale)
 			remoteEvent:FireServer(player, scale)
 			return true
 		else
-			warn("ScaleCharacter: RemoteEvent not available on client")
+			Utility.Log(debugSystem, "warn", "RemoteEvent not available on client")
 			return false
 		end
 	end
@@ -238,7 +242,7 @@ function ScaleCharacter.SetScale(player, scale)
 
 	-- Validate player
 	if not player or not player:IsA("Player") then
-		warn("ScaleCharacter: Invalid player provided")
+		Utility.Log(debugSystem, "warn", "Invalid player provided")
 		return false
 	end
 
@@ -254,7 +258,7 @@ function ScaleCharacter.SetScale(player, scale)
 	-- Get player character
 	local character = player.Character
 	if not character then
-		warn("ScaleCharacter: Character not found for " .. player.Name)
+		Utility.Log(debugSystem, "warn", "Character not found for " .. player.Name)
 		return false
 	end
 
@@ -264,7 +268,7 @@ function ScaleCharacter.SetScale(player, scale)
 	end)
 
 	if not success then
-		warn("ScaleCharacter: Failed to scale character: " .. tostring(errorMsg))
+		Utility.Log(debugSystem, "warn", "Failed to scale character: " .. tostring(errorMsg))
 		return false
 	end
 
@@ -279,9 +283,9 @@ function ScaleCharacter.SetScale(player, scale)
 			if scaleNameStat and scaleValueStat then
 				scaleNameStat.Value = presetName
 				scaleValueStat.Value = numericScale
-				print("Updated scale stats for " .. player.Name .. " to " .. presetName .. " (" .. numericScale .. ")")
+				Utility.Log(debugSystem, "info", "Updated scale stats for " .. player.Name .. " to " .. presetName .. " (" .. numericScale .. ")")
 			else
-				warn("ScaleCharacter: Could not find ScaleName or ScaleValue stats for " .. player.Name .. " even after creation attempt")
+				Utility.Log(debugSystem, "warn", "Could not find ScaleName or ScaleValue stats for " .. player.Name .. " even after creation attempt")
 			end
 		end
 	end

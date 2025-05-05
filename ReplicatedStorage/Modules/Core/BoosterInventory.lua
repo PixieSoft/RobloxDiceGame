@@ -10,6 +10,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Module references
 local Boosters = require(ReplicatedStorage.Modules.Core.Boosters)
 local Stat = require(ReplicatedStorage.Stat)
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+
+-- Debug settings
+local debugSystem = "BoosterInventory"
 
 -- Constants
 local SLOT_HEIGHT = 100 -- Height of each booster slot
@@ -98,7 +102,7 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 	-- Get the booster info from the Boosters module
 	local boosterInfo = Boosters.Items[boosterName]
 	if not boosterInfo then
-		warn("Booster info not found for: " .. boosterName)
+		Utility.Log(debugSystem, "warn", "Booster info not found for: " .. boosterName)
 		return boosterSlot
 	end
 
@@ -262,7 +266,7 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 
 						-- Fire event to server to use the booster with the explicit amount
 						-- Do NOT update the UI here - let the server stat changes trigger the update
-						print("Sending UseBooster event with name:", boosterName, "and quantity:", spendingAmount)
+						Utility.Log(debugSystem, "info", "Sending UseBooster event with name: " .. boosterName .. " and quantity: " .. spendingAmount)
 						useBoosterEvent:FireServer(boosterName, spendingAmount)
 
 						-- Reset spending value to 0 after sending the event
@@ -271,10 +275,10 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 						-- Update the info panel
 						UpdateUsageInfo(boosterName, 0)
 					else
-						warn("UseBooster event not found in BoosterEvents")
+						Utility.Log(debugSystem, "warn", "UseBooster event not found in BoosterEvents")
 					end
 				else
-					warn("BoosterEvents folder not found in ReplicatedStorage")
+					Utility.Log(debugSystem, "warn", "BoosterEvents folder not found in ReplicatedStorage")
 				end
 			end)
 
@@ -296,35 +300,35 @@ end
 
 -- Initialize the module with references to UI elements
 function BoosterInventory.Initialize(menuUI)
-	print("BoosterInventory.Initialize called with UI:", menuUI.Name)
+	Utility.Log(debugSystem, "info", "BoosterInventory.Initialize called with UI: " .. menuUI.Name)
 
 	mainUI = menuUI
 
 	-- Find the Main frame within Menu
 	local mainFrame = menuUI:FindFirstChild("Main")
 	if not mainFrame then
-		warn("Main frame not found in Menu")
+		Utility.Log(debugSystem, "warn", "Main frame not found in Menu")
 		return
 	end
 
 	-- Find the Content frame within Main
 	contentFrame = mainFrame:FindFirstChild("Content")
 	if not contentFrame then
-		warn("Content frame not found in Main")
+		Utility.Log(debugSystem, "warn", "Content frame not found in Main")
 		return
 	end
 
 	-- Find the BoosterInventory frame within Content
 	boostersFrame = contentFrame:FindFirstChild("BoosterInventory")
 	if not boostersFrame then
-		warn("BoosterInventory frame not found in Content")
+		Utility.Log(debugSystem, "warn", "BoosterInventory frame not found in Content")
 		return
 	end
 
 	-- Find the Boosters container within BoosterInventory
 	boostersContainer = boostersFrame:FindFirstChild("Boosters")
 	if not boostersContainer then
-		warn("Boosters container not found in BoosterInventory")
+		Utility.Log(debugSystem, "warn", "Boosters container not found in BoosterInventory")
 		return
 	end
 
@@ -335,14 +339,14 @@ function BoosterInventory.Initialize(menuUI)
 		infoEffectLabel = infoPanel:FindFirstChild("EffectLabel")
 
 		if not infoDescLabel then
-			warn("DescLabel not found in UsageInfo")
+			Utility.Log(debugSystem, "warn", "DescLabel not found in UsageInfo")
 		end
 
 		if not infoEffectLabel then
-			warn("EffectLabel not found in UsageInfo")
+			Utility.Log(debugSystem, "warn", "EffectLabel not found in UsageInfo")
 		end
 	else
-		warn("UsageInfo panel not found in BoosterInventory")
+		Utility.Log(debugSystem, "warn", "UsageInfo panel not found in BoosterInventory")
 	end
 
 	-- Find the Template within Boosters container (it might be stored in an ObjectValue)
@@ -353,7 +357,7 @@ function BoosterInventory.Initialize(menuUI)
 		-- Try to find the template directly
 		template = boostersContainer:FindFirstChild("BoosterTemplate")
 		if not template then
-			warn("Template not found in Boosters container")
+			Utility.Log(debugSystem, "warn", "Template not found in Boosters container")
 			return
 		end
 	end
@@ -379,14 +383,14 @@ function BoosterInventory.Initialize(menuUI)
 		end
 	end
 
-	print("BoosterInventory initialization complete")
+	Utility.Log(debugSystem, "info", "BoosterInventory initialization complete")
 	return BoosterInventory
 end
 
 -- Populate the inventory with booster slots
 function BoosterInventory.Populate()
 	if not player or not mainUI or not boostersContainer or not template then
-		warn("BoosterInventory not properly initialized. Call Initialize first.")
+		Utility.Log(debugSystem, "warn", "BoosterInventory not properly initialized. Call Initialize first.")
 		return 0
 	end
 
@@ -483,7 +487,7 @@ end
 
 -- ForceRefresh function (added to fix the nil error)
 function BoosterInventory.ForceRefresh()
-	print("ForceRefresh called - performing full refresh")
+	Utility.Log(debugSystem, "info", "ForceRefresh called - performing full refresh")
 	return BoosterInventory.Populate()
 end
 

@@ -1,10 +1,14 @@
 -- /StarterGui/Scripts/BoosterInventory/BoosterSlots.lua
 -- LocalScript that initializes and manages the booster inventory UI
--- This script connects to the BoosterInventory module to populate the UI with booster slots
+
+local debugSystem = "BoosterInventory" -- Debug system identifier
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+-- Import Utility for logging
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
 -- Get the player
 local player = Players.LocalPlayer
@@ -14,7 +18,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local Menu = playerGui:WaitForChild("Menu", 10)
 
 if not Menu then
-	warn("Menu GUI not found after 10 seconds")
+	Utility.Log(debugSystem, "warn", "Menu GUI not found after 10 seconds")
 	return
 end
 
@@ -49,7 +53,7 @@ local success, result = pcall(function()
 end)
 
 if not success then
-	warn("Failed to load BoosterInventory module: " .. tostring(result))
+	Utility.Log(debugSystem, "warn", "Failed to load BoosterInventory module: " .. tostring(result))
 	return
 end
 BoosterInventory = result
@@ -165,7 +169,7 @@ local function waitForPlayerData()
 	-- Try to get the Stat module
 	local Stat = require(ReplicatedStorage.Stat)
 	if not Stat.WaitForLoad(player) then
-		warn("Player data failed to load")
+		Utility.Log(debugSystem, "warn", "Player data failed to load")
 		return false
 	end
 	return true
@@ -173,7 +177,7 @@ end
 
 -- Initialize the module once data is loaded
 local function initializeInventory()
-	print("Initializing booster inventory...")
+	Utility.Log(debugSystem, "info", "Initializing booster inventory...")
 
 	-- Initialize the module with the Menu UI
 	BoosterInventory.Initialize(Menu)
@@ -189,7 +193,7 @@ local function initializeInventory()
 		end
 	end)
 
-	print("Booster inventory initialization complete")
+	Utility.Log(debugSystem, "info", "Booster inventory initialization complete")
 end
 
 -- Listen for booster updates from server
@@ -236,7 +240,7 @@ end
 -- Listen for booster activation failures
 failureEvent.OnClientEvent:Connect(function(boosterName, reason)
 	-- Print a message to the output
-	print("Booster activation failed:", boosterName, reason)
+	Utility.Log(debugSystem, "info", "Booster activation failed: " .. boosterName .. " " .. reason)
 
 	-- Force refresh the inventory immediately to show correct counts
 	if Menu.Enabled then
@@ -246,11 +250,11 @@ failureEvent.OnClientEvent:Connect(function(boosterName, reason)
 	-- Show notification to the player about why it failed
 	local message = "Cannot use " .. boosterName .. ": " .. reason
 	showNotification(message, Color3.fromRGB(255, 100, 100), 3)
-	end)
+end)
 
-	-- Make sure player data is loaded before initializing
+-- Make sure player data is loaded before initializing
 if not waitForPlayerData() then
-	print("Waiting for player data to load...")
+	Utility.Log(debugSystem, "info", "Waiting for player data to load...")
 
 	-- Set up a retry system
 	local attempts = 0
@@ -263,7 +267,7 @@ if not waitForPlayerData() then
 			retryConnection:Disconnect()
 			initializeInventory()
 		elseif attempts >= maxAttempts then
-			warn("Failed to load player data after " .. maxAttempts .. " attempts")
+			Utility.Log(debugSystem, "warn", "Failed to load player data after " .. maxAttempts .. " attempts")
 			retryConnection:Disconnect()
 		end
 		task.wait(1) -- Wait 1 second between attempts
@@ -338,4 +342,4 @@ RunService.Heartbeat:Connect(function()
 	task.spawn(updateActiveTimers) -- Run in a separate thread to avoid framerate issues
 end)
 
-print("BoosterSlots script loaded successfully")
+Utility.Log(debugSystem, "info", "BoosterSlots script loaded successfully")

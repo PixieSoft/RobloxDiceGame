@@ -3,6 +3,13 @@
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Debug settings
+local debugSystem = "Menu" -- System name for debug logs
+
+-- Import modules
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -19,6 +26,11 @@ Menu.Enabled = false
 -- Function to toggle menu visibility
 local function toggleMenu()
 	Menu.Enabled = not Menu.Enabled
+	if Menu.Enabled then
+		Utility.Log(debugSystem, "info", "Menu opened")
+	else
+		Utility.Log(debugSystem, "info", "Menu closed")
+	end
 end
 
 -- Connect the toggle function to menu button
@@ -27,6 +39,7 @@ menuButton.MouseButton1Click:Connect(toggleMenu)
 -- Connect the toggle function to close button
 closeButton.MouseButton1Click:Connect(function()
 	Menu.Enabled = false
+	Utility.Log(debugSystem, "info", "Menu closed by close button")
 end)
 
 -- Connect the toggle function to M key press
@@ -36,8 +49,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		-- Check if the input is M key
 		if input.KeyCode == Enum.KeyCode.M then
 			toggleMenu()
+			Utility.Log(debugSystem, "info", "Menu toggled by M key press")
 		end
 	end
 end)
 
-print("Menu toggle system initialized")
+Utility.Log(debugSystem, "info", "Menu toggle system initialized")

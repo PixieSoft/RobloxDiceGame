@@ -3,9 +3,13 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MenuStructure = require(ReplicatedStorage.Modules.Core.MenuStructure)
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
 local TabManager = {}
 TabManager.__index = TabManager  -- Setup metatable for OOP
+
+-- Debug settings
+local debugSystem = "Menu" -- System name for debug logs
 
 -- Create new TabManager instance
 function TabManager.new()
@@ -47,7 +51,7 @@ end
 -- Debug print function that only outputs when debug mode is on
 function TabManager:DebugPrint(...)
 	if self.state.debug then
-		print("[TabManager]", ...)
+		Utility.Log(debugSystem, "info", ...)
 	end
 end
 
@@ -62,7 +66,7 @@ end
 -- Initialize the TabManager with references to UI elements
 function TabManager:Initialize(menuFrame, config)
 	if not menuFrame then
-		warn("TabManager: menuFrame is nil! Cannot initialize.")
+		Utility.Log(debugSystem, "warn", "TabManager: menuFrame is nil! Cannot initialize.")
 		return self
 	end
 
@@ -85,7 +89,7 @@ function TabManager:Initialize(menuFrame, config)
 	-- TopTabs is located in Background.TopBar
 	local topBar = menuFrame:FindFirstChild("TopBar")
 	if not topBar then
-		warn("TabManager: Could not find TopBar in " .. menuFrame.Name)
+		Utility.Log(debugSystem, "warn", "TabManager: Could not find TopBar in " .. menuFrame.Name)
 		return self
 	end
 	self.ui.topTabContainer = topBar
@@ -93,21 +97,21 @@ function TabManager:Initialize(menuFrame, config)
 	-- SideTabs is located directly in Background
 	self.ui.sideTabContainer = menuFrame:FindFirstChild("SideTabs")
 	if not self.ui.sideTabContainer then
-		warn("TabManager: Could not find SideTabs in " .. menuFrame.Name)
+		Utility.Log(debugSystem, "warn", "TabManager: Could not find SideTabs in " .. menuFrame.Name)
 		return self
 	end
 
 	-- Content is located directly in Background
 	self.ui.contentContainer = menuFrame:FindFirstChild("Content")
 	if not self.ui.contentContainer then
-		warn("TabManager: Could not find Content in " .. menuFrame.Name)
+		Utility.Log(debugSystem, "warn", "TabManager: Could not find Content in " .. menuFrame.Name)
 		return self
 	end
 
 	-- Find template for side tab buttons
 	self.ui.templates.sideTabButton = self.ui.sideTabContainer:FindFirstChild("Template")
 	if not self.ui.templates.sideTabButton then
-		warn("TabManager: Missing SideTab button template. Ensure your SideTabs container has a Template child.")
+		Utility.Log(debugSystem, "warn", "TabManager: Missing SideTab button template. Ensure your SideTabs container has a Template child.")
 		return self
 	end
 
@@ -170,13 +174,13 @@ end
 -- Select a top tab and update UI
 function TabManager:SelectTopTab(topTabName)
 	if not self.state.isInitialized then
-		warn("TabManager: Cannot select top tab before initialization.")
+		Utility.Log(debugSystem, "warn", "TabManager: Cannot select top tab before initialization.")
 		return
 	end
 
 	-- Check that this top tab exists in MenuStructure
 	if not MenuStructure.TopTabs[topTabName] then
-		warn("TabManager: Top tab not found in MenuStructure:", topTabName)
+		Utility.Log(debugSystem, "warn", "TabManager: Top tab not found in MenuStructure:", topTabName)
 		return
 	end
 
@@ -200,12 +204,12 @@ end
 -- Select a side tab and update UI
 function TabManager:SelectSideTab(sideTabName)
 	if not self.state.isInitialized then
-		warn("TabManager: Cannot select side tab before initialization.")
+		Utility.Log(debugSystem, "warn", "TabManager: Cannot select side tab before initialization.")
 		return
 	end
 
 	if not self.state.currentTopTab then
-		warn("TabManager: Cannot select side tab before selecting a top tab.")
+		Utility.Log(debugSystem, "warn", "TabManager: Cannot select side tab before selecting a top tab.")
 		return
 	end
 
@@ -225,7 +229,7 @@ function TabManager:SelectSideTab(sideTabName)
 	if contentFrameName then
 		self:ShowContentFrame(contentFrameName)
 	else
-		warn("TabManager: No content frame defined for this tab combination:", 
+		Utility.Log(debugSystem, "warn", "TabManager: No content frame defined for this tab combination:", 
 			self.state.currentTopTab, "/", sideTabName)
 	end
 
@@ -354,7 +358,7 @@ function TabManager:ShowContentFrame(frameName)
 		contentShown:Fire(frameName)
 		contentShown:Destroy()
 	else
-		warn("TabManager: Content frame not found:", frameName)
+		Utility.Log(debugSystem, "warn", "Content frame not found:", frameName)
 	end
 end
 

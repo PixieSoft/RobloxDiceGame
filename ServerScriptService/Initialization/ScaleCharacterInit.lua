@@ -3,17 +3,21 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Load the ScaleCharacter module
+-- Module references
 local ScaleCharacter = require(ReplicatedStorage.Modules.Core.ScaleCharacter)
+local Utility = require(ReplicatedStorage.Modules.Core.Utility)
+
+-- Debug system name for logging
+local debugSystem = "Scaling"
 
 -- The module auto-initializes, but we can explicitly initialize it again if needed
 -- This is useful if we want to make sure initialization happens in a specific order
 local success = ScaleCharacter.Initialize()
 
 if success then
-	print("ScaleCharacter module initialized successfully")
+	Utility.Log(debugSystem, "info", "ScaleCharacter module initialized successfully")
 else
-	warn("Failed to initialize ScaleCharacter module")
+	Utility.Log(debugSystem, "warn", "Failed to initialize ScaleCharacter module")
 end
 
 -- Example of how to use the module (for reference):
