@@ -8,6 +8,12 @@ local IsServer = RunService:IsServer()
 -- Import utility module
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
+-- 🔥 Import LavaBall platform spawner (server-only)
+local LavaBallPlatformManager
+if IsServer then
+	LavaBallPlatformManager = require(game.ServerScriptService.Modules.LavaBallPlatformManager)
+end
+
 -- Debug system name for logging
 local debugSystem = "LavaBalls"
 
@@ -50,8 +56,10 @@ LavaBallsBooster.onActivate = function(player, qty)
 	-- This function only runs on the server
 	if not IsServer then return function() end end
 
-	-- Implementation of creating platforms would go here
-	-- This is a placeholder that would be filled with actual platform creation code
+	-- Call the platform spawn system
+	if LavaBallPlatformManager then
+		LavaBallPlatformManager(player, qty)
+	end
 
 	Utility.Log(debugSystem, "info", "Activated Lava Ball booster for " .. player.Name .. " with " .. qty .. " balls")
 
