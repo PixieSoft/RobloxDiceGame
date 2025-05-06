@@ -129,8 +129,44 @@ local function UpdateBoosterSlot(boosterSlot, boosterName, count, spendingValue)
 		countLabel.Text = tostring(count - spendingValue)
 	end
 
+	-- Set spending value 
+	-- UPDATED: Spending is now directly under the booster slot, not in Controls
+	-- UPDATED: Now also handles TextBox input
+	local spendingInput = boosterSlot:FindFirstChild("Spending")
+	if spendingInput then
+		spendingInput.Text = tostring(spendingValue)
+
+		-- Clean up previous connection if it exists
+		cleanupButtonConnection(spendingInput)
+
+		-- Connect to FocusLost event if this is a TextBox
+		if spendingInput:IsA("TextBox") then
+			local connection = spendingInput.FocusLost:Connect(function(enterPressed)
+				-- Get the value typed in the TextBox
+				local typedValue = tonumber(spendingInput.Text) or 0
+
+				-- Clamp the value between 0 and the total count
+				typedValue = math.max(0, math.min(typedValue, count))
+
+				-- Update the TextBox with the clamped value
+				spendingInput.Text = tostring(typedValue)
+
+				-- Update count display
+				if countLabel then
+					countLabel.Text = tostring(count - typedValue)
+				end
+
+				-- Update the info panel
+				UpdateUsageInfo(boosterName, typedValue)
+			end)
+
+			-- Store the connection for cleanup
+			buttonConnections[spendingInput] = connection
+		end
+	end
+		
 	-- Set spending value
-	local spendingLabel = boosterSlot:FindFirstChild("Controls"):FindFirstChild("Spending")
+	local spendingLabel = boosterSlot:FindFirstChild("Spending")
 	if spendingLabel then
 		spendingLabel.Text = tostring(spendingValue)
 	end
