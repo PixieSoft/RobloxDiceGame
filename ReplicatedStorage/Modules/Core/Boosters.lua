@@ -208,16 +208,18 @@ if IsServer then
 		}
 
 		-- Create the timer - this is the single source of truth for activation status
-		local timer = Timers.CreateTimer(player, boosterName, totalDuration, callbacks)
+		-- Only create timer if booster wants it
+		if booster.useSystemTimer ~= false then
+			local timer = Timers.CreateTimer(player, boosterName, totalDuration, callbacks)
+			if not timer then
+				Utility.Log(debugSystem, "warn", "Failed to create timer for " .. boosterName)
+				return false
+			end
 
-		if not timer then
-			Utility.Log(debugSystem, "warn", "Failed to create timer for " .. boosterName)
-			return false
+			-- Store the quantity as custom value in the timer
+			Timers.SetCustomValue(player, boosterName, "Count", quantity, "IntValue")
 		end
-
-		-- Store the quantity as custom value in the timer
-		Timers.SetCustomValue(player, boosterName, "Count", quantity, "IntValue")
-
+		
 		-- Fire event for UI updates or other systems
 		local BoosterEvents = game.ReplicatedStorage:FindFirstChild("BoosterEvents")
 		if BoosterEvents then

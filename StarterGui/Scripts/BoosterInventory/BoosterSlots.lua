@@ -42,7 +42,7 @@ if not boosterEvents then
 			local event = Instance.new("RemoteEvent")
 			event.Name = eventName
 			event.Parent = boosterEvents
-		endwwwwwwwwwww
+		end
 	end
 end
 

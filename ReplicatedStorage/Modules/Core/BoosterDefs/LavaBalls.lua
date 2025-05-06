@@ -8,10 +8,10 @@ local IsServer = RunService:IsServer()
 -- Import utility module
 local Utility = require(ReplicatedStorage.Modules.Core.Utility)
 
--- 🔥 Import LavaBall platform spawner (server-only)
+-- Import LavaBall platform spawner (server-only)
 local LavaBallPlatformManager
 if IsServer then
-	LavaBallPlatformManager = require(game.ServerScriptService.Modules.LavaBallPlatformManager)
+	LavaBallPlatformManager = require(game.ServerScriptService.Modules.Core.LavaBallPlatformManager)
 end
 
 -- Debug system name for logging
@@ -19,6 +19,8 @@ local debugSystem = "LavaBalls"
 
 -- Create a table that we can reference from within its own methods
 local LavaBallsBooster = {}
+
+LavaBallsBooster.useSystemTimer = false
 
 -- Define properties
 LavaBallsBooster.name = "Lava Ball"

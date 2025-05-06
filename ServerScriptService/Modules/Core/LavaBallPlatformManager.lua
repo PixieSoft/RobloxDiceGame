@@ -124,5 +124,3 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 return spawnLavaPlatform
-
--- call it like this i thnk LavaBallPlatformManager(player, lavaBallsToUse)
